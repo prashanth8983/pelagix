@@ -1,30 +1,17 @@
-// Zero schema for the two tables the engine publishes to Postgres.
+// Zero schema for the two tables the engine publishes to Postgres. The score table's
+// columns come from the project config (src/generated/project.ts, written by codegen).
 // timestamptz columns arrive as epoch milliseconds (number).
 import { createBuilder, createSchema, json, number, string, table } from '@rocicorp/zero'
+import { scoreTable } from '~/generated/project'
+import type { Rule } from '~/lib/types'
 
-export type Rule = { column: string; op: '>' | '>=' | '<' | '<=' | '=' | '!='; value: number }
-
-const entityScores = table('entity_scores')
-  .columns({
-    user_id: number(),
-    total_spend: number().optional(),
-    order_count: number().optional(),
-    first_order_at: number().optional(),
-    last_order_at: number().optional(),
-    days_since_last_order: number().optional(),
-    avg_order_value: number().optional(),
-    tenure_days: number().optional(),
-    ltv: number().optional(),
-    churn_risk: number().optional(),
-    ltv_decile: number().optional(),
-    scored_at: number().optional(),
-  })
-  .primaryKey('user_id')
+export type { Rule }
 
 const segments = table('segments')
   .columns({
     name: string(),
     label: string().optional(),
+    description: string().optional(),
     filter: string().optional(),
     rules: json<Rule[]>().optional(),
     position: number().optional(),
@@ -33,7 +20,7 @@ const segments = table('segments')
   })
   .primaryKey('name')
 
-export const schema = createSchema({ tables: [entityScores, segments] })
+export const schema = createSchema({ tables: [scoreTable, segments] })
 export const zql = createBuilder(schema)
 
 declare module '@rocicorp/zero' {

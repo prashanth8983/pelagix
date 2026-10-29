@@ -2,19 +2,20 @@
 // /api/zero/query to resolve them), so the browser can't ask for arbitrary data.
 import { defineQueries, defineQuery } from '@rocicorp/zero'
 import { z } from 'zod'
+import { NUMERIC_SCORES, PROJECT } from '~/generated/project'
 import { zql } from './schema'
 
-// Columns a segment rule or sort may use. Mirrors the score table.
-export const SCORE_COLUMNS = [
-  'ltv', 'churn_risk', 'total_spend', 'ltv_decile', 'order_count',
-  'days_since_last_order', 'avg_order_value', 'last_order_at',
-] as const
+// Columns a segment rule or sort may use: the numeric scores, from the config.
+export const SCORE_COLUMNS = NUMERIC_SCORES
+const column = z.enum(NUMERIC_SCORES)
 
 const rule = z.object({
-  column: z.enum(SCORE_COLUMNS),
+  column,
   op: z.enum(['>', '>=', '<', '<=', '=', '!=']),
   value: z.number(),
 })
+
+const scores = zql[PROJECT.scoreTable]
 
 export const queries = defineQueries({
   scores: {
@@ -22,15 +23,19 @@ export const queries = defineQueries({
     members: defineQuery(
       z.object({
         rules: z.array(rule).max(8),
-        sortBy: z.enum(SCORE_COLUMNS),
+        sortBy: column,
         sortDir: z.enum(['asc', 'desc']),
-        limit: z.number().int().min(1).max(200),
+        limit: z.number().int().min(1).max(500),
       }),
       ({ args: { rules, sortBy, sortDir, limit } }) => {
-        let q = zql.entity_scores
+        let q = scores
         for (const r of rules) q = q.where(r.column, r.op, r.value)
         return q.orderBy(sortBy, sortDir).limit(limit)
       },
+    ),
+    // One entity, for the detail drawer. Updates live like everything else.
+    one: defineQuery(z.object({ key: z.union([z.number(), z.string()]) }), ({ args: { key } }) =>
+      scores.where(PROJECT.key, '=', key as never).one(),
     ),
   },
   segments: {

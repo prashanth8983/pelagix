@@ -14,6 +14,8 @@ function pickModel(): { id: `${string}/${string}`; apiKey?: string } {
   return { id, apiKey: id.startsWith('openrouter/') ? or : process.env.ANTHROPIC_API_KEY }
 }
 
+const DIALECTS: Record<string, string> = { duckdb: 'DuckDB', snowflake: 'Snowflake' }
+
 export async function askAgent(question: string): Promise<{ answer: string; result?: QueryResult }> {
   const ctx = await getContext()
   let last: QueryResult | undefined
@@ -21,7 +23,7 @@ export async function askAgent(question: string): Promise<{ answer: string; resu
   const runSqlTool = createTool({
     id: 'run_sql',
     description:
-      'Run one read-only DuckDB SELECT against the tables described in your instructions. ' +
+      `Run one read-only ${DIALECTS[ctx.dialect] ?? ctx.dialect} SELECT against the tables described in your instructions. ` +
       'Returns columns and up to 500 rows, or an error to fix and retry.',
     inputSchema: z.object({ sql: z.string().describe('A single SELECT statement') }),
     execute: async ({ sql }) => {
@@ -40,7 +42,7 @@ export async function askAgent(question: string): Promise<{ answer: string; resu
     model: pickModel(),
     tools: { run_sql: runSqlTool },
     instructions: [
-      `You answer a marketer's questions about ${ctx.entity}s by writing DuckDB SQL.`,
+      `You answer a business user's questions about ${ctx.entity}s by writing ${DIALECTS[ctx.dialect] ?? ctx.dialect} SQL.`,
       `Prefer the precomputed ${ctx.score_table} table; join raw tables only when needed.`,
       'Always call run_sql before answering. If it returns an error, fix the SQL and retry.',
       'Use the business terms exactly as defined. Never invent tables or columns.',
