@@ -6,6 +6,7 @@ Needs an empty scorebase_auth.users table (it creates the first admin), or E2E_A
 E2E_ADMIN_PASSWORD for an existing admin. It creates a viewer account named e2e-viewer-<random>.
 """
 import os
+import re
 import secrets
 
 import pytest
@@ -57,7 +58,7 @@ def visit(pg, path):
 
 def test_overview_syncs_live(page):
     visit(page, "/")
-    pw.expect(page.get_by_role("tab", name="Never bought")).to_be_visible(timeout=20000)
+    pw.expect(page.get_by_role("option", name=re.compile("Never bought"))).to_be_visible(timeout=20000)
     pw.expect(page.locator("tbody tr").first).to_be_visible()
     page.locator("tbody tr").first.click()
     pw.expect(page.get_by_role("dialog")).to_be_visible()
