@@ -12,6 +12,7 @@ const segments = table('segments')
     name: string(),
     label: string().optional(),
     description: string().optional(),
+    match: string().optional(),
     filter: string().optional(),
     rules: json<Rule[]>().optional(),
     position: number().optional(),
