@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 200">
+  <g><defs><mask id="m4"><rect width="200" height="200" fill="#fff"/>
+   <path d="M18,124 C48,104 74,104 100,120 S156,140 184,118" fill="none" stroke="#000" stroke-width="9" stroke-linecap="round"/>
+   <g transform="rotate(-28 104 74)"><path d="M58,74 C74,52 116,50 136,74 C116,98 74,96 58,74Z" fill="#000"/><path d="M132,74 L160,54 L152,74 L160,94Z" fill="#000"/></g></mask></defs>
+   <circle cx="100" cy="100" r="84" fill="#0B3C8C" mask="url(#m4)"/>
+   <circle cx="74" cy="85.5" r="3.5" fill="#0B3C8C"/></g>
+  <text x="218" y="134" font-family="Avenir Next, Avenir, Helvetica Neue, sans-serif" font-weight="700" font-size="104" letter-spacing="-2" fill="#0A2350">Pelagi<tspan fill="#12B5C9">x</tspan></text>
+</svg>
