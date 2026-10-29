@@ -1,17 +1,38 @@
 name: ci
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
 
 jobs:
   engine:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: scorebase
+          POSTGRES_PASSWORD: scorebase
+          POSTGRES_DB: scorebase
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U scorebase"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      SCOREBASE_PG_URL: postgresql://scorebase:scorebase@localhost:5432/scorebase
+      SCOREBASE_TEST_PG_URL: postgresql://scorebase:scorebase@localhost:5432/scorebase
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python }}
+          cache: pip
       - run: pip install -e "engine[dev]"
       - run: python -m scorebase generate retail --users 2000
       - run: python -m scorebase run retail --no-publish
@@ -38,3 +59,29 @@ jobs:
         working-directory: app
       - run: pnpm exec tsc --noEmit
         working-directory: app
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build engine image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: engine/Dockerfile
+          push: false
+          tags: scorebase-engine:ci
+      - name: Build app image
+        uses: docker/build-push-action@v6
+        with:
+          context: app
+          push: false
+          tags: scorebase-app:ci
+      - name: Build zero-cache image
+        uses: docker/build-push-action@v6
+        with:
+          context: app
+          target: zero
+          push: false
+          tags: scorebase-zero:ci
