@@ -1,4 +1,5 @@
-# Saved segments over the score table, as structured rules (all rules must hold).
+# Saved segments over the score table, as structured rules. `match: all` (default) needs every
+# rule to hold, `match: any` needs one. Rules may use scores and entity attributes.
 # The engine compiles rules to SQL for counts; the app sends the same rules to Zero.
 - name: all
   label: Customers
@@ -27,3 +28,14 @@
   description: Signed up but no completed order
   rules:
     - {column: order_count, op: "=", value: 0}
+- name: vip_texas
+  label: VIPs in Texas
+  rules:
+    - {column: ltv_decile, op: ">=", value: 9}
+    - {column: state, op: "=", value: Texas}
+- name: email_or_organic
+  label: Email or organic
+  description: Acquired through email or organic search
+  match: any
+  rules:
+    - {column: traffic_source, op: "in", value: [Email, Organic]}
