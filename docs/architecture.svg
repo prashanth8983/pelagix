@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 420" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#4a5a73"/>
+    </marker>
+    <style>
+      .box { fill: #ffffff; stroke: #c9d3e0; stroke-width: 1.2; rx: 8; }
+      .engine { fill: #eaf2fb; stroke: #0E5DB0; }
+      .db { fill: #f1f4f9; stroke: #8e9bb0; }
+      .title { font-weight: 600; fill: #0b1a33; font-size: 14px; }
+      .text { fill: #0b1a33; }
+      .muted { fill: #4a5a73; font-size: 12px; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; fill: #0A2350; }
+      .line { stroke: #4a5a73; stroke-width: 1.3; fill: none; marker-end: url(#arrow); }
+      .label { fill: #4a5a73; font-size: 11.5px; }
+      .zone { fill: none; stroke: #c9d3e0; stroke-dasharray: 5 4; rx: 12; }
+      .zonelabel { fill: #8e9bb0; font-size: 11px; letter-spacing: .04em; }
+    </style>
+  </defs>
+
+  <!-- zones -->
+  <rect class="zone" x="16" y="16" width="470" height="388"/>
+  <text class="zonelabel" x="30" y="36">ENGINE TIER (private network, one per project)</text>
+  <rect class="zone" x="506" y="16" width="458" height="388"/>
+  <text class="zonelabel" x="520" y="36">APP TIER (browsers reach only the web app and zero-cache, through a TLS proxy)</text>
+
+  <!-- config files -->
+  <rect class="box" x="40" y="56" width="200" height="96"/>
+  <text class="title" x="56" y="80">configs/&lt;project&gt;/</text>
+  <text class="mono" x="56" y="100">project · sources · scores</text>
+  <text class="mono" x="56" y="116">segments · model · golden</text>
+  <text class="muted" x="56" y="134">six YAML files, edited in the app</text>
+
+  <!-- data dir -->
+  <rect class="box" x="40" y="172" width="200" height="60"/>
+  <text class="title" x="56" y="196">data/</text>
+  <text class="muted" x="56" y="214">source files, DuckDB file, run logs</text>
+
+  <!-- engine -->
+  <rect class="box engine" x="262" y="56" width="204" height="176"/>
+  <text class="title" x="278" y="80">Engine API (Python)</text>
+  <text class="text" x="278" y="102">load → check → score</text>
+  <text class="text" x="278" y="120">→ segments → publish</text>
+  <text class="text" x="278" y="146">guarded read-only SQL</text>
+  <text class="text" x="278" y="164">verified-query matching</text>
+  <text class="text" x="278" y="182">text-to-SQL agent</text>
+  <text class="muted" x="278" y="206">FastAPI · port 8787</text>
+  <text class="muted" x="278" y="222">one instance per project</text>
+
+  <!-- warehouse -->
+  <rect class="box db" x="262" y="256" width="204" height="78"/>
+  <text class="title" x="278" y="280">Warehouse</text>
+  <text class="text" x="278" y="300">DuckDB file (default)</text>
+  <text class="text" x="278" y="318">or a Postgres schema</text>
+
+  <!-- postgres -->
+  <rect class="box db" x="530" y="56" width="200" height="140"/>
+  <text class="title" x="546" y="80">Postgres</text>
+  <text class="mono" x="546" y="102">public.entity_scores</text>
+  <text class="mono" x="546" y="118">public.segments</text>
+  <text class="mono" x="546" y="134">scorebase_auth.*</text>
+  <text class="mono" x="546" y="150">scorebase_app.dashboards</text>
+  <text class="mono" x="546" y="166">scorebase_meta.runs</text>
+  <text class="muted" x="546" y="186">private; wal_level = logical</text>
+
+  <!-- zero cache -->
+  <rect class="box" x="760" y="56" width="180" height="70"/>
+  <text class="title" x="776" y="80">zero-cache</text>
+  <text class="muted" x="776" y="100">replicates published</text>
+  <text class="muted" x="776" y="116">tables to browsers · :4848</text>
+
+  <!-- web app -->
+  <rect class="box engine" x="530" y="232" width="200" height="130"/>
+  <text class="title" x="546" y="256">Web app (TypeScript)</text>
+  <text class="text" x="546" y="278">pages, editors, dashboards</text>
+  <text class="text" x="546" y="296">users, sessions, audit log</text>
+  <text class="text" x="546" y="314">server functions only</text>
+  <text class="muted" x="546" y="338">TanStack Start · port 3000</text>
+  <text class="muted" x="546" y="352">any number of replicas</text>
+
+  <!-- browser -->
+  <rect class="box" x="760" y="232" width="180" height="130"/>
+  <text class="title" x="776" y="256">Browser</text>
+  <text class="text" x="776" y="278">overview, SQL workspace,</text>
+  <text class="text" x="776" y="296">configuration, dashboards</text>
+  <text class="muted" x="776" y="322">live rows from zero-cache,</text>
+  <text class="muted" x="776" y="338">everything else via the app</text>
+
+  <!-- arrows -->
+  <path class="line" d="M240,104 L262,104"/>
+  <path class="line" d="M240,202 L262,202"/>
+  <path class="line" d="M364,232 L364,256"/>
+  <text class="label" x="372" y="248">read, write</text>
+  <path class="line" d="M466,120 L530,120"/>
+  <text class="label" x="470" y="112">publish</text>
+  <path class="line" d="M730,96 L760,96"/>
+  <text class="label" x="733" y="88">WAL</text>
+  <path class="line" d="M630,196 L630,232"/>
+  <text class="label" x="636" y="218">users, limits</text>
+  <path class="line" d="M530,296 L466,296 L466,232"/>
+  <text class="label" x="474" y="312">bearer token</text>
+  <path class="line" d="M760,296 L730,296"/>
+  <text class="label" x="734" y="288">HTTPS</text>
+  <path class="line" d="M850,232 L850,126"/>
+  <text class="label" x="856" y="184">WebSocket</text>
+  <path class="line" d="M800,126 L800,150 L745,150 L745,300 L730,300"/>
+  <text class="label" x="752" y="166">named queries,</text>
+  <text class="label" x="752" y="180">session cookie</text>
+</svg>
