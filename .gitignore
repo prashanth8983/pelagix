@@ -8,3 +8,4 @@ node_modules/
 .zero/
 .playwright-mcp/
 app/src/routeTree.gen.ts
+configs/*/.history/
