@@ -1,6 +1,10 @@
 // Server-only helpers for talking to the Python query API (engine/scorebase/api.py).
+import { readFileSync } from 'node:fs'
+import { parseEnv } from 'node:util'
+
+// app/.env wins over the shell: a stale exported key elsewhere must not shadow the app's.
 try {
-  process.loadEnvFile?.('.env')
+  Object.assign(process.env, parseEnv(readFileSync('.env', 'utf8')))
 } catch {
   // no .env file: fall back to the real environment
 }

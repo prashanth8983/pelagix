@@ -51,6 +51,8 @@ joins:
   - order_items.product_id = products.id
 
 synonyms:
+  spend: "SUM(order_items.sale_price) counting only items whose status is NOT IN ('Cancelled', 'Returned')"
+  revenue: same as spend
   VIP: ltv_decile >= 9
   at risk: churn_risk > 0.7
   lapsed: days_since_last_order > 60

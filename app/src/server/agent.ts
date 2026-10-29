@@ -1,15 +1,18 @@
-// Text-to-SQL agent: Mastra + Claude, with one tool that runs guarded SQL.
+// Text-to-SQL agent: Mastra + an LLM, with one tool that runs guarded SQL.
 import { Agent } from '@mastra/core/agent'
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
 import { describeModel, getContext, runSql, type QueryResult } from './scorebase'
 
 // Any provider Mastra's model router knows. OpenRouter if its key is set, else Anthropic.
-// Override with SCOREBASE_MODEL, e.g. openrouter/openai/gpt-oss-120b.
-const MODEL =
-  process.env.SCOREBASE_MODEL ??
-  (process.env.OPENROUTER_API_KEY ? 'openrouter/anthropic/claude-sonnet-4-6' : 'anthropic/claude-sonnet-5-5')
-
+// Override with SCOREBASE_MODEL, e.g. openrouter/openai/gpt-oss-120b. Resolved per call,
+// and the key is passed explicitly, so it works however the environment was loaded.
+function pickModel(): { id: `${string}/${string}`; apiKey?: string } {
+  const or = process.env.OPENROUTER_API_KEY
+  const id = (process.env.SCOREBASE_MODEL ??
+    (or ? 'openrouter/anthropic/claude-sonnet-4-6' : 'anthropic/claude-sonnet-5-5')) as `${string}/${string}`
+  return { id, apiKey: id.startsWith('openrouter/') ? or : process.env.ANTHROPIC_API_KEY }
+}
 
 export async function askAgent(question: string): Promise<{ answer: string; result?: QueryResult }> {
   const ctx = await getContext()
@@ -34,19 +37,19 @@ export async function askAgent(question: string): Promise<{ answer: string; resu
   const agent = new Agent({
     id: 'scorebase-analyst',
     name: 'Scorebase analyst',
-    model: MODEL,
+    model: pickModel(),
     tools: { run_sql: runSqlTool },
     instructions: [
       `You answer a marketer's questions about ${ctx.entity}s by writing DuckDB SQL.`,
       `Prefer the precomputed ${ctx.score_table} table; join raw tables only when needed.`,
       'Always call run_sql before answering. If it returns an error, fix the SQL and retry.',
       'Use the business terms exactly as defined. Never invent tables or columns.',
-      'Final answer: two sentences at most, quoting the key numbers. Do not repeat the SQL.',
+      'Final answer: plain text, no markdown, two sentences at most, quoting the key numbers. Do not repeat the SQL.',
       '',
       describeModel(ctx),
     ].join('\n'),
   })
 
-  const res = await agent.generate(question, { maxSteps: 5 })
+  const res = await agent.generate(question, { maxSteps: 5, modelSettings: { maxOutputTokens: 1500 } })
   return { answer: res.text, result: last }
 }

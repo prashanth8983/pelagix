@@ -76,7 +76,7 @@ export function AskBox() {
       {res && (
         <div className="border-t border-line px-5 py-4">
           <div className="flex items-start justify-between gap-4">
-            <p className="text-[15px]">{res.answer}</p>
+            <p className="text-[15px]">{res.answer.replace(/\*\*/g, '')}</p>
             <span
               className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
                 res.source === 'verified' ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-accent'

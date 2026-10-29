@@ -30,7 +30,7 @@ make app            # terminal 3: web app     :3000
 make test           # 13 engine tests, 5/5 golden queries, app typecheck
 ```
 
-Optional: put `ANTHROPIC_API_KEY=...` in `app/.env` so the Ask box can answer questions that no verified query covers.
+Optional: put `OPENROUTER_API_KEY=...` (or `ANTHROPIC_API_KEY`) in `app/.env` so the Ask box can answer questions that no verified query covers.
 
 ## What's verified
 
@@ -41,7 +41,7 @@ Optional: put `ANTHROPIC_API_KEY=...` in `app/.env` so the Ask box can answer qu
 | Re-publish with no changes | 0 rows written |
 | Edit one row in Postgres | shows in the open page in ~1.5s, no reload |
 | Ask box, verified path | answers + Show SQL in the browser |
-| Ask box, agent path (Mastra + Claude) | typechecks; not yet run, needs an API key |
+| Ask box, agent path (Mastra + Claude via OpenRouter) | answered an unseen question with a correct 3-table join, checked against the engine |
 | Snowflake warehouse | code written; not yet run, needs an account |
 
 ## Notes
