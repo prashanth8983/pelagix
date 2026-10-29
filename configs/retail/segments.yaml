@@ -1,13 +1,22 @@
-# Saved segments: filters over the published score table. Re-counted on every run.
+# Saved segments over the score table, as structured rules (all rules must hold).
+# The engine compiles rules to SQL for counts; the app sends the same rules to Zero.
+- name: all
+  label: Customers
+  rules: []
 - name: vip
   label: VIPs
-  where: "ltv_decile >= 9"
+  rules:
+    - {column: ltv_decile, op: ">=", value: 9}
 - name: at_risk
   label: At risk
-  where: "churn_risk > 0.7"
+  rules:
+    - {column: churn_risk, op: ">", value: 0.7}
 - name: vip_lapsing
   label: VIPs who stopped buying
-  where: "ltv_decile >= 9 AND days_since_last_order > 60"
+  rules:
+    - {column: ltv_decile, op: ">=", value: 9}
+    - {column: days_since_last_order, op: ">", value: 60}
 - name: one_and_done
   label: One-time buyers
-  where: "order_count = 1"
+  rules:
+    - {column: order_count, op: "=", value: 1}

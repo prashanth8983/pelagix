@@ -27,6 +27,7 @@ def _q(name: str) -> str:
 
 def run(project, wh, segments: list[dict]) -> dict:
     import psycopg
+    from psycopg.types.json import Jsonb
 
     env = project.project.get("publish", {}).get("postgres_url_env", "SCOREBASE_PG_URL")
     url = os.environ.get(env)
@@ -65,13 +66,17 @@ def run(project, wh, segments: list[dict]) -> dict:
 
         cur.execute("""CREATE TABLE IF NOT EXISTS segments (
             name text PRIMARY KEY, label text, filter text, size bigint, updated_at timestamptz)""")
-        for s in segments:
+        cur.execute("ALTER TABLE segments ADD COLUMN IF NOT EXISTS rules jsonb")
+        cur.execute("ALTER TABLE segments ADD COLUMN IF NOT EXISTS position int")
+        for i, s in enumerate(segments):
             cur.execute(
-                """INSERT INTO segments (name, label, filter, size, updated_at)
-                   VALUES (%s, %s, %s, %s, now())
-                   ON CONFLICT (name) DO UPDATE SET label = EXCLUDED.label,
-                     filter = EXCLUDED.filter, size = EXCLUDED.size, updated_at = now()""",
-                (s["name"], s.get("label", s["name"]), s["where"], s["size"]),
+                """INSERT INTO segments (name, label, filter, rules, position, size, updated_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, now())
+                   ON CONFLICT (name) DO UPDATE SET label = EXCLUDED.label, filter = EXCLUDED.filter,
+                     rules = EXCLUDED.rules, position = EXCLUDED.position,
+                     size = EXCLUDED.size, updated_at = now()""",
+                (s["name"], s.get("label", s["name"]), s["where"], Jsonb(s.get("rules", [])), i, s["size"]),
             )
+        cur.execute("DELETE FROM segments WHERE NOT (name = ANY(%s))", ([s["name"] for s in segments],))
         con.commit()
     return {"rows": len(rows), "written": upserted, "deleted": deleted}
