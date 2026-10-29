@@ -1,6 +1,7 @@
 # Per-customer scores. Each `sql` is an expression over `from`, grouped by the entity key.
 # A score may use other scores by name; the scorer orders them by dependency.
 # `default` fills customers with no qualifying rows (never ordered); otherwise they get NULL.
+# A score may bring its own `from`, `where` and `key_expr` to aggregate another table (see web_sessions).
 from: |
   order_items oi
   JOIN orders o ON o.order_id = oi.order_id
@@ -61,3 +62,11 @@ scores:
     label: LTV decile
     description: LTV decile among buyers, 10 = top
     format: count
+  - name: web_sessions
+    sql: "COUNT(*)"
+    from: events ev
+    key_expr: ev.user_id
+    label: Web sessions
+    description: Site visits recorded in the events table
+    format: count
+    default: 0
