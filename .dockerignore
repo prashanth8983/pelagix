@@ -1,0 +1,11 @@
+# Root build context is used by engine/Dockerfile only.
+.git
+.venv
+app
+data
+tests
+docs
+*.egg-info
+__pycache__
+.pytest_cache
+configs/*/.history
