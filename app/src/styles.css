@@ -7,78 +7,124 @@
 
 /* Semantic tokens. Components use these names only, so both themes change in one place. */
 :root {
+  /* Pelagix palette (docs/brand): navy #0A2350, deep #0B3C8C, ocean #0E5DB0, teal #12B5C9,
+     cyan #19D3E0, paper #F4F7FB. Neutrals are tinted toward the navy; color stays sparing. */
   color-scheme: light;
-  --bg: #fafafa;
+  --bg: #f6f8fb;
   --surface: #ffffff;
-  --subtle: #f4f4f5;
-  --hover: #f4f4f5;
-  --line: #e4e4e7;
-  --line-strong: #d4d4d8;
-  --fg: #09090b;
-  --muted: #52525b;
-  --faint: #a1a1aa;
-  --primary: #18181b;
-  --primary-fg: #fafafa;
-  --accent: #2563eb;
-  --accent-subtle: #eff6ff;
-  --danger: #dc2626;
-  --danger-subtle: #fef2f2;
-  --warning: #b45309;
-  --warning-subtle: #fffbeb;
-  --success: #15803d;
-  --success-subtle: #f0fdf4;
-  /* Chart series, validated categorical slots 1-3 (blue, orange, aqua) for the light surface. */
-  --chart-1: #2a78d6;
+  --subtle: #f1f4f9;
+  --hover: #edf1f7;
+  --line: #e1e7ef;
+  --line-strong: #c9d3e0;
+  --fg: #0b1a33;
+  --muted: #4a5a73;
+  --faint: #8e9bb0;
+  --primary: #0A2350;
+  --primary-fg: #ffffff;
+  --accent: #0E5DB0;
+  --accent-subtle: #eaf2fb;
+  --brand: #12B5C9;
+  --danger: #c62828;
+  --danger-subtle: #fdf1f1;
+  --warning: #a35a00;
+  --warning-subtle: #fff7e8;
+  --success: #12805c;
+  --success-subtle: #ecf8f3;
+  /* Chart series, validated for this surface: ocean (slot 1), orange, aqua. */
+  --chart-1: #0E5DB0;
   --chart-2: #eb6834;
   --chart-3: #1baf7a;
-  --chart-grid: #f0f0f2;
-  --overlay: rgb(9 9 11 / 0.4);
-  --ring: rgb(37 99 235 / 0.25);
+  --chart-4: #7c5cd6;
+  --chart-5: #d9a400;
+  --chart-6: #12B5C9;
+  --chart-grid: #edf1f6;
+  --overlay: rgb(10 35 80 / 0.35);
+  --ring: rgb(14 93 176 / 0.22);
+  /* Elevation: navy-tinted, soft. 1 = resting card, 2 = raised control, 3 = popover, 4 = panel. */
+  --elev-1: 0 1px 2px rgb(10 35 80 / 0.05), 0 1px 1px rgb(10 35 80 / 0.03);
+  /* Resting cards: a soft drop plus a hairline, so panels lift off the paper background. */
+  --elev-card: 0 1px 2px rgb(10 35 80 / 0.04), 0 4px 14px -4px rgb(10 35 80 / 0.08);
+  --elev-card-hover: 0 2px 4px rgb(10 35 80 / 0.05), 0 12px 28px -8px rgb(10 35 80 / 0.14);
+  /* Chrome: the sidebar casts to the right, the header down; the header deepens once the page scrolls under it. */
+  --elev-side: 1px 0 0 rgb(10 35 80 / 0.06), 6px 0 24px -10px rgb(10 35 80 / 0.12);
+  --elev-header: 0 1px 0 rgb(10 35 80 / 0.06);
+  --elev-header-scrolled: 0 1px 0 rgb(10 35 80 / 0.07), 0 8px 24px -12px rgb(10 35 80 / 0.18);
+  --elev-nav: 0 1px 2px rgb(10 35 80 / 0.08), inset 0 0 0 1px rgb(14 93 176 / 0.12);
+  --elev-2: 0 2px 6px rgb(10 35 80 / 0.08), 0 1px 2px rgb(10 35 80 / 0.05);
+  --elev-3: 0 10px 24px -6px rgb(10 35 80 / 0.16), 0 3px 8px rgb(10 35 80 / 0.06);
+  --elev-4: 0 24px 48px -12px rgb(10 35 80 / 0.28), 0 8px 16px -4px rgb(10 35 80 / 0.1);
   /* SQL syntax (GitHub-like, readable on --subtle) */
   --code-keyword: #cf222e;
   --code-function: #8250df;
   --code-string: #0a3069;
   --code-number: #0550ae;
   --code-comment: #6e7781;
-  --code-gutter: #a1a1aa;
+  --code-gutter: #9aa6b8;
 }
 
 .dark {
   color-scheme: dark;
-  --bg: #09090b;
-  --surface: #111113;
-  --subtle: #18181b;
-  --hover: #1c1c1f;
-  --line: #27272a;
-  --line-strong: #3f3f46;
-  --fg: #fafafa;
-  --muted: #a1a1aa;
-  --faint: #71717a;
-  --primary: #fafafa;
-  --primary-fg: #09090b;
-  --accent: #60a5fa;
-  --accent-subtle: rgb(59 130 246 / 0.12);
-  --danger: #f87171;
-  --danger-subtle: rgb(248 113 113 / 0.1);
-  --warning: #fbbf24;
-  --warning-subtle: rgb(251 191 36 / 0.1);
-  --success: #4ade80;
-  --success-subtle: rgb(74 222 128 / 0.1);
-  --chart-1: #3987e5;
+  --bg: #060c18;
+  --surface: #0b1424;
+  --subtle: #0f1a2e;
+  --hover: #132038;
+  --line: #1b2a44;
+  --line-strong: #2b3d5d;
+  --fg: #e9eef7;
+  --muted: #9aaac2;
+  --faint: #61728f;
+  --primary: #F4F7FB;
+  --primary-fg: #0A2350;
+  --accent: #3fc3d6;
+  --accent-subtle: rgb(25 211 224 / 0.1);
+  --brand: #19D3E0;
+  --danger: #f27a7a;
+  --danger-subtle: rgb(242 122 122 / 0.1);
+  --warning: #f2b544;
+  --warning-subtle: rgb(242 181 68 / 0.1);
+  --success: #4fd1a1;
+  --success-subtle: rgb(79 209 161 / 0.1);
+  /* Same hues stepped for the dark surface, validated against #0b1424. */
+  --chart-1: #2a9fd6;
   --chart-2: #d95926;
   --chart-3: #199e70;
-  --chart-grid: #1f1f23;
-  --overlay: rgb(0 0 0 / 0.6);
-  --ring: rgb(96 165 250 / 0.3);
+  --chart-4: #9b86e8;
+  --chart-5: #e0b63a;
+  --chart-6: #19D3E0;
+  --chart-grid: #15223a;
+  --overlay: rgb(2 6 14 / 0.65);
+  --ring: rgb(63 195 214 / 0.28);
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.35);
+  --elev-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 18px -6px rgb(0 0 0 / 0.45);
+  --elev-card-hover: 0 2px 4px rgb(0 0 0 / 0.35), 0 14px 32px -10px rgb(0 0 0 / 0.6);
+  --elev-side: 1px 0 0 rgb(255 255 255 / 0.05), 8px 0 28px -10px rgb(0 0 0 / 0.6);
+  --elev-header: 0 1px 0 rgb(255 255 255 / 0.05);
+  --elev-header-scrolled: 0 1px 0 rgb(255 255 255 / 0.06), 0 10px 28px -12px rgb(0 0 0 / 0.7);
+  --elev-nav: 0 1px 2px rgb(0 0 0 / 0.4), inset 0 0 0 1px rgb(42 159 214 / 0.18);
+  --elev-2: 0 2px 6px rgb(0 0 0 / 0.4), 0 1px 2px rgb(0 0 0 / 0.3);
+  --elev-3: 0 12px 28px -8px rgb(0 0 0 / 0.6), 0 3px 8px rgb(0 0 0 / 0.35);
+  --elev-4: 0 28px 56px -14px rgb(0 0 0 / 0.75), 0 8px 16px -4px rgb(0 0 0 / 0.4);
   --code-keyword: #ff7b72;
   --code-function: #d2a8ff;
   --code-string: #a5d6ff;
   --code-number: #79c0ff;
   --code-comment: #8b949e;
-  --code-gutter: #52525b;
+  --code-gutter: #4c5d7a;
 }
 
 @theme inline {
+  /* Tailwind's shadow scale maps onto the elevation tokens, so shadow-sm … shadow-2xl follow the theme. */
+  --shadow-sm: var(--elev-1);
+  --shadow-card: var(--elev-card);
+  --shadow-card-hover: var(--elev-card-hover);
+  --shadow-side: var(--elev-side);
+  --shadow-header: var(--elev-header);
+  --shadow-header-scrolled: var(--elev-header-scrolled);
+  --shadow-nav: var(--elev-nav);
+  --shadow-md: var(--elev-2);
+  --shadow-lg: var(--elev-3);
+  --shadow-xl: var(--elev-4);
+  --shadow-2xl: var(--elev-4);
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
   --color-canvas: var(--bg);
@@ -94,6 +140,7 @@
   --color-primary-fg: var(--primary-fg);
   --color-accent: var(--accent);
   --color-accent-subtle: var(--accent-subtle);
+  --color-brand: var(--brand);
   --color-danger: var(--danger);
   --color-danger-subtle: var(--danger-subtle);
   --color-warning: var(--warning);
@@ -128,7 +175,106 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .anim-fade { animation: fade-in 120ms ease-out; }
 .anim-rise { animation: rise-in 140ms ease-out; }
 .anim-slide { animation: slide-in 160ms ease-out; }
+@keyframes page-in { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+.anim-page { animation: page-in 180ms cubic-bezier(0.2, 0, 0, 1); }
+/* Staggered entrance for grids of cards: each child starts a little after the previous one. */
+.anim-stagger > * { animation: rise-in 360ms cubic-bezier(0.2, 0, 0, 1) both; animation-delay: calc(var(--i, 0) * 60ms); }
+/* Interactive surfaces share one easing so hover and focus feel the same everywhere. */
+button, a, input, select, textarea, [role="tab"], [role="button"] { transition-timing-function: cubic-bezier(0.2, 0, 0, 1); }
+
+/* Overview water scene (components/overview/Fish.tsx). Carriers move in percent of the
+   scene width; inner elements bob or arc; the surface drifts; the leaper's splash fires on
+   the same clock as its dive. */
+.fish-scene {
+  perspective: 700px;
+  /* Feather the left and right edges so the water and the fish fade into the page instead of ending at a box edge. */
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+}
+/* Water fades out at the bottom edge, so there is no hard line beside the floating Ask box. */
+.water-deep, .water-surface { mask-image: linear-gradient(to bottom, #000 62%, transparent); -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent); }
+.water-deep {
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--accent) 10%, transparent) 40%, color-mix(in srgb, var(--primary) 18%, transparent));
+}
+.dark .water-deep {
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--brand) 8%, transparent) 40%, color-mix(in srgb, var(--brand) 16%, transparent));
+}
+
+/* The big cruiser: across and back, turning in a wide arc at each end. The last frame equals
+   the first, so the loop has no jump. */
+@keyframes fish-cross {
+  0%   { left: 10%; transform: rotateY(180deg); animation-timing-function: ease-in-out; }
+  44%  { left: 76%; transform: rotateY(180deg); animation-timing-function: ease-in-out; }
+  50%  { left: 80%; transform: rotateY(0deg);   animation-timing-function: ease-in-out; }
+  94%  { left: 14%; transform: rotateY(0deg);   animation-timing-function: ease-in-out; }
+  100% { left: 10%; transform: rotateY(180deg); }
+}
+/* The small deep fish: one way only, entering and leaving beyond the feathered edges, so it
+   never turns or pops on screen. */
+@keyframes fish-cross-deep {
+  from { left: 104%; }
+  to   { left: -10%; }
+}
+@keyframes fish-bob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-6px) rotate(3deg); } }
+@keyframes fish-bob-slow { 0%, 100% { transform: translateY(0) rotate(2deg); } 50% { transform: translateY(4px) rotate(-2deg); } }
+@keyframes fish-tail { 0%, 100% { transform: rotate(-11deg); } 50% { transform: rotate(11deg); } }
+@keyframes fish-fin { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes wave-drift { to { transform: translateX(80px); } }
+
+/* The leaper. One 14 s cycle: 0 to 22% it travels from 30% to 58% of the width; the inner
+   element rises in an arc, pitches nose-up on the way out and nose-down on the way in, and
+   is hidden under the surface for the rest of the cycle. */
+@keyframes fish-leap-x {
+  0%   { left: 30%; opacity: 0; animation-timing-function: linear; }
+  3%   { opacity: 1; }
+  20%  { opacity: 1; }
+  22%  { left: 58%; }
+  25%  { left: 59.5%; opacity: 0; }
+  100% { left: 59.5%; opacity: 0; }
+}
+@keyframes fish-leap-y {
+  0%   { transform: translateY(30px) rotate(-38deg); animation-timing-function: ease-out; }
+  11%  { transform: translateY(-66px) rotate(-4deg); animation-timing-function: ease-in; }
+  22%  { transform: translateY(34px) rotate(50deg); animation-timing-function: ease-out; }
+  25%  { transform: translateY(44px) rotate(56deg); }
+  100% { transform: translateY(44px) rotate(56deg); }
+}
+/* Splash: a widening ring on the surface and a few drops thrown up, right as the dive lands. */
+@keyframes splash-ring {
+  0%, 20% { transform: translateX(-50%) scale(0.3); opacity: 0; }
+  23% { opacity: 0.9; }
+  38% { transform: translateX(-50%) scale(2.2); opacity: 0; }
+  100% { transform: translateX(-50%) scale(2.2); opacity: 0; }
+}
+@keyframes splash-drop {
+  0%, 21% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  23% { opacity: 0.9; }
+  30% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 0.7; }
+  36% { transform: translate(calc(var(--dx) * 1.3), 6px) scale(0.8); opacity: 0; }
+  100% { transform: translate(calc(var(--dx) * 1.3), 6px) scale(0.8); opacity: 0; }
+}
+@keyframes fish-bubble {
+  0% { transform: translateY(0) scale(0.5); opacity: 0; }
+  25% { opacity: 0.5; }
+  100% { transform: translateY(-40px) translateX(4px) scale(1); opacity: 0; }
+}
+.fish-carrier { animation: fish-cross 24s infinite; transform-style: preserve-3d; }
+.fish-carrier-deep { animation: fish-cross-deep 34s linear infinite; transform-style: preserve-3d; }
+.fish-bob { animation: fish-bob 2.8s ease-in-out infinite; }
+.fish-bob-slow { animation: fish-bob-slow 3.6s ease-in-out infinite; }
+.fish-tail { transform-box: fill-box; transform-origin: 0% 50%; animation: fish-tail 0.55s ease-in-out infinite; }
+.fish-fin { transform-box: fill-box; transform-origin: 20% 80%; animation: fish-fin 0.9s ease-in-out infinite; }
+.fish-leap-x { animation: fish-leap-x 14s infinite; }
+.fish-leap-y { animation: fish-leap-y 14s infinite; }
+.splash-ring { animation: splash-ring 14s infinite; opacity: 0; }
+.splash-drop { animation: splash-drop 14s infinite; opacity: 0; }
+.wave-drift-slow { animation: wave-drift 11s linear infinite; }
+.wave-drift-fast { animation: wave-drift 7s linear infinite; }
+.fish-bubble { opacity: 0; animation: fish-bubble 4.2s ease-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim-fade, .anim-rise, .anim-slide { animation: none; }
+  .anim-stagger > *, .anim-fade, .anim-rise, .anim-slide, .anim-page, .fish-carrier, .fish-carrier-deep, .fish-bob, .fish-bob-slow, .fish-tail, .fish-fin,
+  .fish-leap-x, .fish-leap-y, .splash-ring, .splash-drop, .wave-drift-slow, .wave-drift-fast { animation: none; }
+  .fish-carrier { left: 56%; } .fish-carrier-deep { left: 20%; } .fish-leap-x, .splash-ring, .splash-drop { display: none; }
+  .fish-bubble { display: none; }
 }
