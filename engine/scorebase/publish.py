@@ -20,6 +20,7 @@ PG_TYPES = [
     (r"^(DOUBLE|FLOAT|REAL)", "double precision"),
     (r"^DATE$", "date"),
     (r"^TIMESTAMP", "timestamptz"),
+    (r"^(CHARACTER|VARCHAR|TEXT|STRING)", "text"),
     (r"^TIME", "time"),
     (r"^(JSON|STRUCT|MAP|VARIANT|OBJECT|ARRAY)|\[\]$", "jsonb"),
 ]
@@ -28,6 +29,11 @@ PG_TYPES = [
 def pg_type(warehouse_type: str) -> str:
     t = warehouse_type.upper().strip()
     return next((pg for pat, pg in PG_TYPES if re.search(pat, t)), "text")
+
+
+# information_schema spells some types differently from the DDL names above.
+_PG_ALIASES = {"timestamp with time zone": "timestamptz", "timestamp without time zone": "timestamp",
+               "time without time zone": "time", "character varying": "text", "character": "text"}
 
 
 def _q(name: str) -> str:
@@ -56,7 +62,7 @@ def run(project, wh, segments: list[dict]) -> dict:
         cur.execute(
             "SELECT column_name, data_type FROM information_schema.columns "
             "WHERE table_schema = current_schema() AND table_name = %s", (table,))
-        existing = dict(cur.fetchall())
+        existing = {c: _PG_ALIASES.get(t, t) for c, t in cur.fetchall()}
         for c in cols:
             if c not in existing:  # new scores added to the config become new columns
                 cur.execute(f"ALTER TABLE {T} ADD COLUMN {_q(c)} {types[c]}")
@@ -67,7 +73,7 @@ def run(project, wh, segments: list[dict]) -> dict:
             cur.execute(f"ALTER TABLE {T} DROP COLUMN {_q(c)}")
 
         cur.execute(f"CREATE TEMP TABLE incoming (LIKE {T} INCLUDING DEFAULTS) ON COMMIT DROP")
-        _, rows = wh.stream(f"SELECT {', '.join(cols)} FROM {table}")
+        _, rows = wh.stream(f"SELECT {', '.join(wh.quote(c) for c in cols)} FROM {wh.quote(table)}")
         n = 0
         with cur.copy(f"COPY incoming ({', '.join(map(_q, cols))}) FROM STDIN") as cp:
             for r in rows:
@@ -92,14 +98,15 @@ def run(project, wh, segments: list[dict]) -> dict:
         cur.execute("ALTER TABLE segments ADD COLUMN IF NOT EXISTS rules jsonb")
         cur.execute("ALTER TABLE segments ADD COLUMN IF NOT EXISTS position int")
         cur.execute("ALTER TABLE segments ADD COLUMN IF NOT EXISTS description text")
+        cur.execute("ALTER TABLE segments ADD COLUMN IF NOT EXISTS match text")
         for i, s in enumerate(segments):
             cur.execute(
-                """INSERT INTO segments (name, label, description, filter, rules, position, size, updated_at)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, now())
+                """INSERT INTO segments (name, label, description, match, filter, rules, position, size, updated_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, now())
                    ON CONFLICT (name) DO UPDATE SET label = EXCLUDED.label, description = EXCLUDED.description,
-                     filter = EXCLUDED.filter, rules = EXCLUDED.rules, position = EXCLUDED.position,
-                     size = EXCLUDED.size, updated_at = now()""",
-                (s["name"], s.get("label") or s["name"], s.get("description"), s["where"],
+                     match = EXCLUDED.match, filter = EXCLUDED.filter, rules = EXCLUDED.rules,
+                     position = EXCLUDED.position, size = EXCLUDED.size, updated_at = now()""",
+                (s["name"], s.get("label") or s["name"], s.get("description"), s.get("match", "all"), s["where"],
                  Jsonb(s.get("rules", [])), i, s["size"]),
             )
         cur.execute("DELETE FROM segments WHERE NOT (name = ANY(%s))", ([s["name"] for s in segments],))
