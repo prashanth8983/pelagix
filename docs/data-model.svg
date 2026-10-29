@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 360" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#4a5a73"/></marker>
+    <style>
+      .tbl { fill: #ffffff; stroke: #8e9bb0; stroke-width: 1.2; rx: 8; }
+      .out { stroke: #0E5DB0; }
+      .hd { fill: #0b1a33; font-weight: 600; font-size: 13.5px; }
+      .schema { fill: #4a5a73; font-size: 11px; }
+      .col { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; fill: #0A2350; }
+      .key { font-weight: 700; }
+      .note { fill: #4a5a73; font-size: 11.5px; }
+      .line { stroke: #4a5a73; stroke-width: 1.2; fill: none; marker-end: url(#a); }
+      .group { fill: none; stroke: #c9d3e0; stroke-dasharray: 5 4; rx: 12; }
+      .glabel { fill: #8e9bb0; font-size: 11px; letter-spacing: .04em; }
+    </style>
+  </defs>
+
+  <rect class="group" x="16" y="16" width="470" height="328"/>
+  <text class="glabel" x="30" y="36">RAW TABLES (warehouse, one per source; the retail example)</text>
+
+  <rect class="tbl" x="36" y="52" width="164" height="112"/>
+  <text class="hd" x="48" y="72">users</text>
+  <text class="col key" x="48" y="92">id</text>
+  <text class="col" x="48" y="108">state</text>
+  <text class="col" x="48" y="124">traffic_source</text>
+  <text class="col" x="48" y="140">age, gender, …</text>
+  <text class="note" x="48" y="156">the entity table</text>
+
+  <rect class="tbl" x="210" y="52" width="130" height="96"/>
+  <text class="hd" x="222" y="72">orders</text>
+  <text class="col key" x="222" y="92">order_id</text>
+  <text class="col" x="222" y="108">user_id</text>
+  <text class="col" x="222" y="124">status</text>
+  <text class="col" x="222" y="140">created_at</text>
+
+  <rect class="tbl" x="364" y="52" width="108" height="96"/>
+  <text class="hd" x="376" y="72">order_items</text>
+  <text class="col" x="376" y="92">order_id</text>
+  <text class="col" x="376" y="108">user_id</text>
+  <text class="col" x="376" y="124">product_id</text>
+  <text class="col" x="376" y="140">sale_price</text>
+
+  <rect class="tbl" x="36" y="200" width="164" height="80"/>
+  <text class="hd" x="48" y="220">events</text>
+  <text class="col key" x="48" y="240">id</text>
+  <text class="col" x="48" y="256">user_id</text>
+  <text class="col" x="48" y="272">event_type, created_at</text>
+
+  <rect class="tbl" x="210" y="200" width="130" height="80"/>
+  <text class="hd" x="222" y="220">products</text>
+  <text class="col key" x="222" y="240">id</text>
+  <text class="col" x="222" y="256">category, brand</text>
+  <text class="col" x="222" y="272">retail_price</text>
+
+  <path class="line" d="M200,100 L210,100"/>
+  <path class="line" d="M340,100 L364,100"/>
+  <path class="line" d="M111,200 L111,164"/>
+  <path class="line" d="M275,200 L275,148"/>
+  <text class="note" x="36" y="316">Arrows follow the joins in model.yaml. Scores aggregate orders, order_items</text>
+  <text class="note" x="36" y="332">and events, grouped by user_id; attributes come straight from users.</text>
+
+  <rect class="group" x="506" y="16" width="458" height="328"/>
+  <text class="glabel" x="520" y="36">PUBLISHED TABLES (Postgres, public schema; synced to browsers)</text>
+
+  <rect class="tbl out" x="526" y="52" width="222" height="236"/>
+  <text class="hd" x="538" y="72">entity_scores</text>
+  <text class="col key" x="538" y="92">user_id</text>
+  <text class="col" x="538" y="110">state, traffic_source</text>
+  <text class="note" x="538" y="124">attributes from users</text>
+  <text class="col" x="538" y="144">total_spend, order_count</text>
+  <text class="col" x="538" y="160">first_order_at, last_order_at</text>
+  <text class="col" x="538" y="176">days_since_last_order</text>
+  <text class="col" x="538" y="192">avg_order_value, tenure_days</text>
+  <text class="col" x="538" y="208">ltv, churn_risk, ltv_decile</text>
+  <text class="col" x="538" y="224">web_sessions</text>
+  <text class="note" x="538" y="238">scores from scores.yaml</text>
+  <text class="col" x="538" y="258">scored_at</text>
+  <text class="note" x="538" y="278">one row per user, buyers or not</text>
+
+  <rect class="tbl out" x="764" y="52" width="180" height="140"/>
+  <text class="hd" x="776" y="72">segments</text>
+  <text class="col key" x="776" y="92">name</text>
+  <text class="col" x="776" y="108">label, description</text>
+  <text class="col" x="776" y="124">match, rules (json)</text>
+  <text class="col" x="776" y="140">filter (the SQL form)</text>
+  <text class="col" x="776" y="156">size, position</text>
+  <text class="col" x="776" y="172">updated_at</text>
+
+  <text class="note" x="764" y="220">Other schemas, same database:</text>
+  <text class="col" x="764" y="238">scorebase_auth</text>
+  <text class="note" x="764" y="252">users, sessions, limits, audit</text>
+  <text class="col" x="764" y="272">scorebase_app</text>
+  <text class="note" x="764" y="286">dashboards</text>
+  <text class="col" x="764" y="306">scorebase_meta</text>
+  <text class="note" x="764" y="320">pipeline runs</text>
+
+  <path class="line" d="M472,100 L526,100"/>
+  <text class="note" x="478" y="92">publish</text>
+</svg>
