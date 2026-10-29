@@ -2,8 +2,8 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { Laptop, LogOut } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { ago } from '~/components/format'
-import { useToast } from '~/components/Toaster'
+import { ago } from '~/components/ui/format'
+import { useToast } from '~/components/ui/Toaster'
 import { Badge, Button, Callout, Card, ConfirmButton, Field, Input, PageHeader, Skeleton } from '~/components/ui'
 import { useMe } from '~/lib/session'
 import { changePassword, logout, mySessions, revokeSessions, type SessionInfo } from '~/server/users'
@@ -12,8 +12,8 @@ export const Route = createFileRoute('/account')({ component: Account })
 
 const ROLE_HELP = {
   viewer: 'Read data, ask questions and run SQL.',
-  editor: 'Everything a viewer can, plus change configuration and run the pipeline.',
-  admin: 'Everything an editor can, plus manage users and read the audit log.',
+  editor: 'Viewer access, plus config and pipeline runs.',
+  admin: 'Editor access, plus users and the audit log.',
 }
 
 // A readable device name from a user agent, without a parsing library.
@@ -97,7 +97,7 @@ function Account() {
           </Card>
         </div>
 
-        <Card title="Password" description="Changing it signs you out everywhere else">
+        <Card title="Password" description="Signs out your other sessions">
           <form
             method="post"
             className="space-y-4"
