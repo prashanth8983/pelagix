@@ -1,13 +1,20 @@
 """Write the app's view of a project (app/src/generated/project.ts) from its config and the
 score table's real column types. `scorebase run` calls this after publishing, so a score
-added in the config shows up in the app's Zero schema, tables and filters.
+or attribute added in the config shows up in the app's Zero schema, tables and filters.
 """
 import json
+import os
+from pathlib import Path
 
 from . import config, publish
 
 ZERO = {"boolean": "boolean", "jsonb": "json", "text": "string", "time": "string"}
-OUT = config.ROOT / "app" / "src" / "generated" / "project.ts"
+
+
+def out_path() -> Path:
+    env = os.environ.get("SCOREBASE_APP_DIR")
+    app = Path(env).expanduser().resolve() if env else config.ROOT / "app"
+    return app / "src" / "generated" / "project.ts"
 
 
 def _zero_type(pg: str) -> str:
@@ -19,6 +26,7 @@ def render(project, wh) -> str:
     cols = [(c, publish.pg_type(t)) for c, t in wh.describe(project.score_table)]
     types = dict(cols)
     scores = {s["name"]: s for s in project.scores["scores"]}
+    attributes = [a for a in project.attributes if a in types]
     display = project.project.get("display", {})
     numeric = [c for c, t in cols if c in scores and _zero_type(t) == "number"]
 
@@ -31,6 +39,9 @@ def render(project, wh) -> str:
         }
         for name, s in scores.items() if name in types
     }
+    attr_meta = {a: {"label": a.replace("_", " ").capitalize(), "kind": _zero_type(types[a])} for a in attributes}
+    # Columns a segment rule may use, with the kind the editor needs to offer the right input.
+    filters = {**{a: _zero_type(types[a]) for a in attributes}, **{c: "number" for c in numeric}}
     columns = display.get("columns") or numeric[:5]
     entity = project.project.get("entity", "entity")
     project_meta = {
@@ -58,13 +69,21 @@ export const scoreTable = table({json.dumps(project.score_table)})
   }})
   .primaryKey({json.dumps(key)})
 
-// Scores that segment rules, sorting and charts may use.
+// Scores that sorting and charts may use.
 export const NUMERIC_SCORES = {json.dumps(numeric)} as const
+
+// Entity attributes carried into the score table (text, filterable).
+export const ATTRIBUTES = {json.dumps(attributes)} as const
+
+// Every column a segment rule may use, and whether it holds a number or text.
+export const FILTER_COLUMNS = {j(filters)} as const
 
 export const SCORES: Record<string, {{ label: string; description: string; format: string; kind: string }}> = {j(meta)}
 
+export const ATTRIBUTE_META: Record<string, {{ label: string; kind: string }}> = {j(attr_meta)}
+
 export const DISPLAY = {j({
-        "columns": [c for c in columns if c in meta],
+        "columns": [c for c in columns if c in meta or c in attr_meta],
         "highlight": display.get("highlight"),
         "defaultSort": display.get("default_sort") or (numeric[0] if numeric else key),
         "sortDir": display.get("sort_dir", "desc"),
@@ -74,9 +93,10 @@ export const DISPLAY = {j({
 
 def write(project, wh) -> bool:
     """Write the file if it changed. Returns whether it did."""
+    out = out_path()
     text = render(project, wh)
-    if OUT.exists() and OUT.read_text() == text:
+    if out.exists() and out.read_text() == text:
         return False
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(text)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text)
     return True
