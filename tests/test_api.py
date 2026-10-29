@@ -1,13 +1,9 @@
-"""The engine API over real HTTP, against a throwaway copy of the retail project."""
-import json
+"""The engine API over HTTP (FastAPI test client), against a throwaway copy of the retail project."""
 import shutil
-import threading
-import urllib.error
-import urllib.request
-from http.server import ThreadingHTTPServer
 
 import pytest
 import yaml
+from fastapi.testclient import TestClient
 
 from scorebase import api, config, ingest, scorer, warehouse
 from scorebase.generate import generate
@@ -16,7 +12,14 @@ TOKEN = "test-token-123"
 
 
 @pytest.fixture(scope="module")
-def server(tmp_path_factory, monkeypatch_module):
+def monkeypatch_module():
+    mp = pytest.MonkeyPatch()
+    yield mp
+    mp.undo()
+
+
+@pytest.fixture(scope="module")
+def client(tmp_path_factory, monkeypatch_module):
     tmp = tmp_path_factory.mktemp("api")
     d = tmp / "retail"
     shutil.copytree(config.find("retail"), d, ignore=shutil.ignore_patterns(".history"))
@@ -36,63 +39,91 @@ def server(tmp_path_factory, monkeypatch_module):
     wh.close()
 
     monkeypatch_module.setenv("SCOREBASE_API_TOKEN", TOKEN)
-    srv = ThreadingHTTPServer(("127.0.0.1", 0), api.make_handler(str(d)))
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    yield f"http://127.0.0.1:{srv.server_port}", d
-    srv.shutdown()
+    monkeypatch_module.delenv("SCOREBASE_PG_URL", raising=False)
+    with TestClient(api.create_app(str(d)), raise_server_exceptions=False) as c:
+        c.headers["Authorization"] = f"Bearer {TOKEN}"
+        yield c, d
 
 
-@pytest.fixture(scope="module")
-def monkeypatch_module():
-    mp = pytest.MonkeyPatch()
-    yield mp
-    mp.undo()
+def test_token_is_required(client):
+    c, _ = client
+    assert c.get("/health", headers={"Authorization": ""}).status_code == 401
+    assert c.get("/health", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    assert c.get("/health").status_code == 200
 
 
-def call(base, path, body=None, method=None, token=TOKEN, headers=None):
-    req = urllib.request.Request(base + path, method=method or ("POST" if body is not None else "GET"),
-                                 data=json.dumps(body).encode() if body is not None else None,
-                                 headers={"Content-Type": "application/json", **(headers or {}),
-                                          **({"Authorization": f"Bearer {token}"} if token else {})})
-    try:
-        with urllib.request.urlopen(req) as r:
-            return r.status, json.loads(r.read()), dict(r.headers)
-    except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read()), dict(e.headers)
+def test_request_id_is_echoed_or_made(client):
+    c, _ = client
+    assert c.get("/health", headers={"X-Request-Id": "abc123"}).headers["X-Request-Id"] == "abc123"
+    assert len(c.get("/health").headers["X-Request-Id"]) == 32
 
 
-def test_token_is_required(server):
-    base, _ = server
-    assert call(base, "/health", token=None)[0] == 401
-    assert call(base, "/health", token="wrong")[0] == 401
-    assert call(base, "/health")[0] == 200
+def test_ready_opens_the_warehouse(client):
+    c, _ = client
+    r = c.get("/ready")
+    assert (r.status_code, r.json()) == (200, {"ok": True})
 
 
-def test_request_id_is_echoed_or_made(server):
-    base, _ = server
-    assert call(base, "/health", headers={"X-Request-Id": "abc123"})[2]["X-Request-Id"] == "abc123"
-    assert len(call(base, "/health")[2]["X-Request-Id"]) == 32
+def test_openapi_is_served(client):
+    c, _ = client
+    paths = c.get("/openapi.json").json()["paths"]
+    assert "/query" in paths and "/config/{section}" in paths
 
 
-def test_ready_opens_the_warehouse(server):
-    base, _ = server
-    assert call(base, "/ready")[:2] == (200, {"ok": True})
+def test_query_is_guarded(client):
+    c, _ = client
+    r = c.post("/query", json={"sql": "COPY (SELECT 1) TO '/tmp/x.csv'"})
+    assert r.status_code == 400 and r.json()["error"].startswith("blocked")
+    r = c.post("/query", json={"sql": "SELECT COUNT(*) AS n FROM entity_scores"})
+    assert r.status_code == 200 and r.json()["rows"] == [[300]]
+    assert c.post("/query", json={}).status_code == 422
+    assert c.get("/runs/nope").status_code == 404
 
 
-def test_query_is_guarded(server):
-    base, _ = server
-    code, body, _ = call(base, "/query", {"sql": "COPY (SELECT 1) TO '/tmp/x.csv'"})
-    assert code == 400 and body["error"].startswith("blocked")
-    code, body, _ = call(base, "/query", {"sql": "SELECT COUNT(*) AS n FROM entity_scores"})
-    assert code == 200 and body["rows"] == [[300]]
+def test_save_validates_then_keeps_history(client):
+    c, d = client
+    r = c.put("/config/segments", json={"data": [{"name": "x", "rules": [{"column": "nope", "op": ">", "value": 1}]}]})
+    assert r.status_code == 422 and any("nope" in e for e in r.json()["errors"])
+    segs = c.get("/config").json()["segments"]
+    segs.append({"name": "big", "label": "Big", "match": "any",
+                 "rules": [{"column": "ltv", "op": ">", "value": 1000}, {"column": "state", "op": "in", "value": ["Texas"]}]})
+    assert c.put("/config/segments", json={"data": segs}).status_code == 200
+    assert c.get("/config").json()["segments"][-1]["name"] == "big"
+    assert len(c.get("/config/segments/history").json()) == 1
 
 
-def test_save_validates_then_keeps_history(server):
-    base, d = server
-    code, body, _ = call(base, "/config/segments", {"data": [{"name": "x", "rules": [{"column": "nope", "op": ">", "value": 1}]}]}, "PUT")
-    assert code == 422 and any("nope" in e for e in body["errors"])
-    _, cfg, _ = call(base, "/config")
-    segs = cfg["segments"] + [{"name": "big", "label": "Big", "rules": [{"column": "ltv", "op": ">", "value": 1000}]}]
-    assert call(base, "/config/segments", {"data": segs}, "PUT")[0] == 200
-    assert call(base, "/config")[1]["segments"][-1]["name"] == "big"
-    assert len(call(base, "/config/segments/history")[1]) == 1
+def test_segment_preview_counts(client):
+    c, _ = client
+    r = c.post("/preview/segment", json={"rules": [{"column": "state", "op": "=", "value": "Texas"}]}).json()
+    assert 0 < r["size"] < r["total"] and r["where"] == "state = 'Texas'"
+    r = c.post("/preview/segment", json={"match": "any", "rules": [
+        {"column": "state", "op": "=", "value": "Texas"}, {"column": "state", "op": "=", "value": "Florida"}]}).json()
+    assert "OR" in r["where"]
+    assert c.post("/preview/segment", json={"rules": [{"column": "state", "op": "in", "value": 3}]}).json()["errors"]
+
+
+def test_distribution_bins(client):
+    c, _ = client
+    r = c.post("/distribution", json={"column": "ltv", "bins": 10})
+    assert r.status_code == 200
+    bins = [row[0] for row in r.json()["rows"]]
+    assert bins == sorted(bins) and max(bins) <= 9
+    assert c.post("/distribution", json={"column": "state"}).status_code == 400
+
+
+def test_source_preview_refuses_paths_outside_data(client):
+    c, _ = client
+    r = c.post("/preview/source", json={"source": {"name": "x", "connector": "csv", "path": "/etc/passwd"}})
+    assert r.status_code == 403 and "must be under" in r.json()["error"]
+    r = c.post("/preview/source", json={"source": {"name": "x", "connector": "csv", "path": "https://example.com/a.csv"}})
+    assert r.status_code == 403 and "SCOREBASE_REMOTE_SOURCES" in r.json()["error"]
+
+
+def test_scores_preview_has_stats(client):
+    c, _ = client
+    r = c.post("/preview/scores", json={}).json()
+    assert "error" not in r and len(r["rows"]) == 20
+    by = {s["column_name"]: s for s in r["stats"]}
+    assert 0 <= by["churn_risk"]["min"] <= by["churn_risk"]["max"] <= 1
+    assert by["last_order_at"]["avg"] is None, "dates have no average"
+    assert any(p["group"] == 1 for p in r["plan"]), "the events score comes from a second source group"
