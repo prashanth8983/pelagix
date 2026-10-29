@@ -2,11 +2,11 @@
 import { useQuery } from '@rocicorp/zero/react'
 import { X } from 'lucide-react'
 import { useEffect } from 'react'
-import { PROJECT, SCORES } from '~/generated/project'
+import { ATTRIBUTES, PROJECT, SCORES } from '~/generated/project'
 import { queries } from '~/zero/queries'
-import { formatScore, scoreLabel } from './format'
-import { RatioBar } from './MembersTable'
-import { Button, Skeleton } from './ui'
+import { formatScore, scoreLabel } from '~/components/ui/format'
+import { RatioBar } from '~/components/overview/MembersTable'
+import { Button, Skeleton } from '~/components/ui'
 
 export function EntityDrawer({ entityKey, onClose }: { entityKey: string | number; onClose: () => void }) {
   const [row] = useQuery(queries.scores.one({ key: entityKey }))
@@ -38,6 +38,16 @@ export function EntityDrawer({ entityKey, onClose }: { entityKey: string | numbe
             <div className="space-y-3 p-5">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-8" />)}</div>
           ) : (
             <dl className="divide-y divide-line">
+              {ATTRIBUTES.length > 0 && (
+                <div className="flex flex-wrap gap-x-5 gap-y-1.5 px-5 py-3">
+                  {ATTRIBUTES.map((a) => (
+                    <div key={a} className="min-w-0">
+                      <p className="text-[11px] text-faint">{scoreLabel(a)}</p>
+                      <p className="truncate text-[13px]">{r[a] == null ? '—' : String(r[a])}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
               {Object.keys(SCORES).map((name) => (
                 <div key={name} className="grid grid-cols-[1fr_auto] items-center gap-4 px-5 py-3">
                   <dt className="min-w-0">
