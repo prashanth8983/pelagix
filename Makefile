@@ -1,10 +1,11 @@
-# Local dev. Run `make setup` once, then `make data`, then `api`, `zero`, `app` in three terminals.
+# Local development. `make setup` once, `make data` once, then `make dev` (or `api`, `zero`
+# and `app` in three terminals). `make stack` runs everything in Docker instead.
 PY      := .venv/bin/python
 PG_URL  := postgresql://scorebase:scorebase@localhost:5433/scorebase
 PROJECT ?= retail
 
-setup:
-	python3.13 -m venv .venv && .venv/bin/pip install -q -e "engine[dev]"
+setup:           ## venv, pnpm install, app/.env, Postgres in Docker
+	python3 -m venv .venv && .venv/bin/pip install -q -e "engine[dev]"
 	cd app && pnpm install
 	$(MAKE) env
 	docker compose up -d --wait
@@ -22,6 +23,9 @@ data:            ## generate demo data, score it, publish to Postgres, update th
 score:           ## re-score and publish (only changed rows are written)
 	SCOREBASE_PG_URL=$(PG_URL) $(PY) -m scorebase run $(PROJECT)
 
+dev:             ## engine API, zero-cache and the web app in one terminal
+	PY=$(PY) PROJECT=$(PROJECT) SCOREBASE_PG_URL=$(PG_URL) scripts/dev.sh
+
 api:             ## engine API for the app (port 8787); reads app/.env, including the shared token
 	SCOREBASE_PG_URL=$(PG_URL) $(PY) -m scorebase.api $(PROJECT) --port 8787
 
@@ -33,11 +37,14 @@ zero:            ## Zero sync server (port 4848); forwards the session cookie to
 app:             ## web app (port 3000)
 	cd app && pnpm dev
 
-test:
-	$(PY) -m pytest -q tests && $(PY) -m scorebase validate $(PROJECT) && $(PY) -m scorebase eval $(PROJECT)
+stack:           ## the whole stack in Docker (needs SCOREBASE_API_TOKEN in the environment)
+	docker compose --profile stack up --build
+
+test:            ## engine and API tests, config validation, golden queries, app typecheck
+	SCOREBASE_TEST_PG_URL=$(PG_URL) $(PY) -m pytest -q tests && $(PY) -m scorebase validate $(PROJECT) && $(PY) -m scorebase eval $(PROJECT)
 	cd app && npx tsc --noEmit
 
 e2e:             ## browser tests against the running stack (needs: pip install playwright && playwright install chromium)
 	E2E_BASE_URL=$${E2E_BASE_URL:-http://localhost:3000} $(PY) -m pytest -q tests/e2e
 
-.PHONY: setup env data score api zero app test e2e
+.PHONY: setup env data score dev api zero app stack test e2e
