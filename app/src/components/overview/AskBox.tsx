@@ -4,13 +4,15 @@ import { useEffect, useRef, useState } from 'react'
 import { useMe } from '~/lib/session'
 import { ask, type AskResponse } from '~/server/ask'
 import { saveSection } from '~/server/config'
-import { useConfig } from './config/state'
-import { ResultView } from './ResultView'
-import { useToast } from './Toaster'
-import { SqlBlock } from './Sql'
-import { Badge, Button, Spinner, cx } from './ui'
+import { useConfig } from '~/components/config/state'
+import { ResultView } from '~/components/sql/ResultView'
+import { useToast } from '~/components/ui/Toaster'
+import { SqlBlock } from '~/components/sql/Sql'
+import { Badge, Button, Spinner, cx } from '~/components/ui'
 
-export function AskBox({ initial }: { initial?: string }) {
+// `hero` is the large centered version on the overview; `onActiveChange` reports whether a
+// question is running or answered, so the page can make room for the answer.
+export function AskBox({ initial, hero = false, onActiveChange }: { initial?: string; hero?: boolean; onActiveChange?: (active: boolean) => void }) {
   const run = useServerFn(ask)
   const save = useServerFn(saveSection)
   const { config, reload } = useConfig()
@@ -29,7 +31,9 @@ export function AskBox({ initial }: { initial?: string }) {
   const input = useRef<HTMLInputElement>(null)
   useEffect(() => setReady(true), [])
 
-  const suggestions = (config?.golden ?? []).slice(0, 4).map((g) => g.question)
+  const suggestions = (config?.golden ?? []).slice(0, hero ? 3 : 4).map((g) => g.question)
+  const active = !!(res || busy || err)
+  useEffect(() => onActiveChange?.(active), [active, onActiveChange])
 
   const submit = async (question: string) => {
     if (!question.trim()) return
@@ -66,15 +70,18 @@ export function AskBox({ initial }: { initial?: string }) {
   }
 
   return (
-    <section className={cx('rounded-lg border bg-surface transition-[border-color,box-shadow]', focused ? 'border-accent ring-3 ring-ring' : 'border-line')}>
+    <div>
+    <section className={cx('border bg-surface transition-[border-color,box-shadow]',
+      hero ? 'rounded-xl shadow-[0_10px_40px_-12px_rgb(10_35_80/0.18)]' : 'rounded-lg',
+      focused ? 'border-accent ring-3 ring-ring' : 'border-line')}>
       <form
         onSubmit={(e) => {
           e.preventDefault()
           submit(q)
         }}
-        className="flex items-center gap-3 px-4"
+        className={cx('flex items-center gap-3', hero ? 'px-5' : 'px-4')}
       >
-        <Sparkles className="size-4 shrink-0 text-faint" strokeWidth={1.75} />
+        <Sparkles className="size-4 shrink-0 text-accent" strokeWidth={1.75} />
         <input
           ref={input}
           value={q}
@@ -83,7 +90,7 @@ export function AskBox({ initial }: { initial?: string }) {
           onBlur={() => setFocused(false)}
           disabled={!ready}
           placeholder="Ask a question about your data"
-          className="h-12 flex-1 bg-transparent text-[14px] outline-none placeholder:text-faint"
+          className={cx('flex-1 bg-transparent outline-none placeholder:text-faint', hero ? 'h-14 text-[15px]' : 'h-12 text-[14px]')}
         />
         {res && !busy && (
           <Button variant="ghost" size="sm" aria-label="Clear" icon={<X />} onClick={() => { setRes(null); setQ(''); setErr(null); input.current?.focus() }} />
@@ -91,13 +98,15 @@ export function AskBox({ initial }: { initial?: string }) {
         <Button type="submit" variant="primary" size="sm" aria-label="Ask" disabled={!ready || !q.trim()} loading={busy} icon={<ArrowUp />} />
       </form>
 
-      {!res && !busy && !err && suggestions.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 border-t border-line px-4 py-2.5">
+      {!hero && !active && suggestions.length > 0 && (
+        // One quiet line of examples; it scrolls sideways instead of wrapping.
+        <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap border-t border-line px-4 py-2 [mask-image:linear-gradient(to_right,black_92%,transparent)] [scrollbar-width:none]">
+          <span className="mr-1 shrink-0 text-[12px] text-faint">Try</span>
           {suggestions.map((s) => (
             <button
               key={s}
               onClick={() => submit(s)}
-              className="h-7 rounded-md border border-line px-2.5 text-[12px] text-muted transition-colors hover:border-line-strong hover:text-fg"
+              className="h-6 shrink-0 rounded-md px-2 text-[12px] text-muted transition-colors hover:bg-hover hover:text-fg"
             >
               {s}
             </button>
@@ -117,7 +126,7 @@ export function AskBox({ initial }: { initial?: string }) {
           <div className="flex items-start justify-between gap-4">
             <p className="text-[14px] leading-relaxed">{res.answer.replace(/\*\*/g, '')}</p>
             {res.source === 'verified' ? <Badge tone="success"><BadgeCheck className="size-3" />Verified</Badge>
-              : res.source === 'agent' ? <Badge tone="accent">Generated</Badge>
+              : res.source === 'agent' ? <Badge tone="accent"><Sparkles className="size-3" />Generated by the agent</Badge>
               : <Badge>No answer</Badge>}
           </div>
 
@@ -137,7 +146,7 @@ export function AskBox({ initial }: { initial?: string }) {
               </Button>
               <span className="text-[12px] text-faint">{res.rows?.length ?? 0} rows{res.attempts ? ` · ${res.attempts} attempt${res.attempts > 1 ? 's' : ''}` : ''}</span>
               {res.source === 'agent' && can('editor') && !saved && (
-                <Button size="sm" className="ml-auto" icon={<BadgeCheck />} onClick={verify} title="Check the SQL first: verified answers are shown as exact">
+                <Button size="sm" className="ml-auto" icon={<BadgeCheck />} onClick={verify} title="Check the SQL before saving">
                   Save as verified
                 </Button>
               )}
@@ -147,12 +156,26 @@ export function AskBox({ initial }: { initial?: string }) {
             <SqlBlock
               className="anim-fade mt-2"
               sql={res.sql}
-              label={res.source === 'verified' ? 'Verified query' : 'Generated query'}
+              label={res.source === 'verified' ? 'Verified query' : <span className="flex items-center gap-1.5"><Sparkles className="size-3.5 text-accent" />Generated query</span>}
               meta={res.source === 'verified' ? res.matched : 'Checked by the SQL guard before it ran'}
             />
           )}
         </div>
       )}
     </section>
+    {hero && !active && suggestions.length > 0 && (
+      <div className="mt-4 flex flex-wrap justify-center gap-2">
+        {suggestions.map((sug) => (
+          <button
+            key={sug}
+            onClick={() => submit(sug)}
+            className="rounded-full border border-line bg-surface px-3 py-1.5 text-[12.5px] text-muted transition-colors hover:border-line-strong hover:text-fg"
+          >
+            {sug}
+          </button>
+        ))}
+      </div>
+    )}
+    </div>
   )
 }
