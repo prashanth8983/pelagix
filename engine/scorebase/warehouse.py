@@ -1,7 +1,11 @@
 """Warehouse connections behind one small interface.
 
-DuckDB runs locally with no account. Snowflake is the production target; switch with
-`warehouse.kind: snowflake` in project.yaml and SNOWFLAKE_* environment variables.
+DuckDB runs locally with no account and is the default. Postgres is the second
+production choice: raw tables and scores live in their own schema of any Postgres
+database (the app's own works), so one database runs the whole stack. Snowflake is
+written but has not been run against an account.
+
+Switch with `warehouse.kind` in project.yaml.
 """
 import json
 import os
@@ -73,17 +77,54 @@ class Warehouse:
     def tables(self) -> list[str]:
         raise NotImplementedError
 
+    def create_table_as(self, name: str, select: str) -> None:
+        """Replace a table with the result of a SELECT."""
+        raise NotImplementedError
+
     def load_source(self, src: dict, location: str) -> dict:
         """Land one source as a raw table. Returns {rows, added}."""
+        raise NotImplementedError
+
+    def preview(self, src: dict, location: str, limit: int = 20) -> dict:
+        """Read a source without landing it: inferred columns and the first rows."""
         raise NotImplementedError
 
     def close(self) -> None:
         pass
 
 
+# ---------------------------------------------------------------- DuckDB (also the file reader)
+
+READERS = {"csv": "read_csv_auto", "parquet": "read_parquet", "json": "read_json_auto"}
+
+
+def duck_reader(con, src: dict, location: str) -> str:
+    """The FROM-clause expression that reads a source with DuckDB."""
+    if src.get("connector") == "postgres":
+        dsn = os.environ.get(src["dsn_env"])
+        if not dsn:
+            raise SystemExit(f"source '{src['name']}': set {src['dsn_env']} to a Postgres URL")
+        con.execute("INSTALL postgres; LOAD postgres;")
+        con.execute("DETACH DATABASE IF EXISTS sb_pg")
+        con.execute(f"ATTACH {lit(dsn)} AS sb_pg (TYPE postgres, READ_ONLY)")
+        if src.get("query"):
+            return f"postgres_query('sb_pg', {lit(src['query'])})"
+        parts = [ident(p) for p in src["table"].split(".")]
+        return "sb_pg." + ".".join(parts if len(parts) > 1 else ["public", *parts])
+    fn = READERS.get(src.get("connector", "csv"))
+    if not fn:
+        raise ValueError(f"can't load connector '{src.get('connector')}'")
+    opts = "".join(f", {ident(k)} = {lit(v)}" for k, v in (src.get("options") or {}).items())
+    return f"{fn}({lit(location)}{opts})"
+
+
+def duck_detach(con, src: dict) -> None:
+    if src.get("connector") == "postgres":
+        con.execute("DETACH DATABASE IF EXISTS sb_pg")
+
+
 class DuckDBWarehouse(Warehouse):
     dialect = "duckdb"
-    READERS = {"csv": "read_csv_auto", "parquet": "read_parquet", "json": "read_json_auto"}
 
     def __init__(self, path: Path, read_only: bool = False):
         import duckdb
@@ -93,7 +134,8 @@ class DuckDBWarehouse(Warehouse):
             cfg = {"enable_external_access": False, "lock_configuration": True}
             self.con = duckdb.connect(str(path), read_only=True, config=cfg)
         else:
-            path.parent.mkdir(parents=True, exist_ok=True)
+            if str(path) != ":memory:":
+                path.parent.mkdir(parents=True, exist_ok=True)
             self.con = duckdb.connect(str(path))
 
     def execute(self, sql: str) -> None:
@@ -130,30 +172,15 @@ class DuckDBWarehouse(Warehouse):
         return [(r[0], r[1]) for r in self.con.execute(f"DESCRIBE {ident(table)}").fetchall()]
 
     def tables(self):
-        return [r[0] for r in self.con.execute("SELECT table_name FROM duckdb_tables() ORDER BY 1").fetchall()]
+        return [r[0] for r in self.con.execute(
+            "SELECT table_name FROM duckdb_tables() WHERE NOT internal ORDER BY 1").fetchall()]
 
-    def reader(self, src: dict, location: str) -> str:
-        """The FROM-clause expression that reads a source."""
-        if src.get("connector") == "postgres":
-            dsn = os.environ.get(src["dsn_env"])
-            if not dsn:
-                raise SystemExit(f"source '{src['name']}': set {src['dsn_env']} to a Postgres URL")
-            self.con.execute("INSTALL postgres; LOAD postgres;")
-            self.con.execute("DETACH DATABASE IF EXISTS sb_pg")
-            self.con.execute(f"ATTACH {lit(dsn)} AS sb_pg (TYPE postgres, READ_ONLY)")
-            if src.get("query"):
-                return f"postgres_query('sb_pg', {lit(src['query'])})"
-            parts = [ident(p) for p in src["table"].split(".")]
-            return "sb_pg." + ".".join(parts if len(parts) > 1 else ["public", *parts])
-        fn = self.READERS.get(src.get("connector", "csv"))
-        if not fn:
-            raise ValueError(f"duckdb warehouse can't load connector '{src.get('connector')}'")
-        opts = "".join(f", {ident(k)} = {lit(v)}" for k, v in (src.get("options") or {}).items())
-        return f"{fn}({lit(location)}{opts})"
+    def create_table_as(self, name: str, select: str) -> None:
+        self.con.execute(f"CREATE OR REPLACE TABLE {ident(name)} AS\n{select}")
 
     def load_source(self, src: dict, location: str) -> dict:
         t = ident(src["name"])
-        reader = self.reader(src, location)
+        reader = duck_reader(self.con, src, location)
         try:
             exists = src["name"] in self.tables()
             if src.get("mode") == "incremental" and exists:
@@ -169,24 +196,173 @@ class DuckDBWarehouse(Warehouse):
             rows = self.con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
             return {"rows": rows, "added": rows}
         finally:
-            if src.get("connector") == "postgres":
-                self.con.execute("DETACH DATABASE IF EXISTS sb_pg")
+            duck_detach(self.con, src)
 
     def preview(self, src: dict, location: str, limit: int = 20) -> dict:
-        """Read a source without landing it: inferred columns and the first rows."""
-        reader = self.reader(src, location)
+        reader = duck_reader(self.con, src, location)
         try:
             schema = self.con.execute(f"DESCRIBE SELECT * FROM {reader}").fetchall()
             cur = self.con.execute(f"SELECT * FROM {reader} LIMIT {int(limit)}")
             return {"columns": [{"name": r[0], "type": r[1]} for r in schema],
                     "rows": [list(r) for r in cur.fetchall()]}
         finally:
-            if src.get("connector") == "postgres":
-                self.con.execute("DETACH DATABASE IF EXISTS sb_pg")
+            duck_detach(self.con, src)
 
     def close(self) -> None:
         self.con.close()
 
+
+# ---------------------------------------------------------------- Postgres
+
+# DuckDB reader type -> Postgres column type when landing a file. Floats become numeric so
+# ROUND(x, 2) and friends behave the same as on DuckDB.
+_PG_LOAD_TYPES = [
+    (r"^BOOL", "boolean"),
+    (r"^(TINYINT|SMALLINT|INTEGER|INT|UTINYINT|USMALLINT)\b", "integer"),
+    (r"^(BIGINT|UINTEGER|HUGEINT|UBIGINT|UHUGEINT)\b", "bigint"),
+    (r"^(DECIMAL|NUMERIC|DOUBLE|FLOAT|REAL)", "numeric"),
+    (r"^DATE$", "date"),
+    (r"^TIMESTAMP WITH TIME ZONE", "timestamptz"),
+    (r"^TIMESTAMP", "timestamp"),
+    (r"^TIME", "time"),
+    (r"^(JSON|STRUCT|MAP)|\[\]$", "jsonb"),
+    (r"^BLOB", "bytea"),
+]
+
+
+def pg_load_type(duck_type: str) -> str:
+    t = duck_type.upper().strip()
+    return next((pg for pat, pg in _PG_LOAD_TYPES if re.search(pat, t)), "text")
+
+
+class PostgresWarehouse(Warehouse):
+    """Raw tables and scores in one schema of a Postgres database.
+
+    Files are read with an in-memory DuckDB (so csv, parquet, json, globs and reader
+    options work exactly as on the DuckDB warehouse) and copied in with COPY.
+    """
+
+    dialect = "postgres"
+
+    def __init__(self, url: str, schema: str = "warehouse", read_only: bool = False):
+        import psycopg
+
+        self.schema = bare(schema)
+        self.con = psycopg.connect(url, autocommit=True)
+        self.read_only = read_only
+        with self.con.cursor() as cur:
+            if not read_only:
+                cur.execute(f"CREATE SCHEMA IF NOT EXISTS {ident(self.schema)}")
+            cur.execute(f"SET search_path = {ident(self.schema)}")
+            if read_only:
+                cur.execute("SET default_transaction_read_only = on")
+
+    def execute(self, sql: str) -> None:
+        with self.con.cursor() as cur:
+            cur.execute(sql)
+
+    def query(self, sql: str, max_rows: int | None = None, timeout: float | None = None):
+        import psycopg
+
+        try:
+            with self.con.transaction(), self.con.cursor() as cur:
+                if timeout:
+                    cur.execute(f"SET LOCAL statement_timeout = {int(timeout * 1000)}")
+                cur.execute(sql)
+                cols = [d.name for d in cur.description]
+                rows = cur.fetchmany(max_rows) if max_rows else cur.fetchall()
+        except psycopg.errors.QueryCanceled as e:
+            raise Timeout(f"query took longer than {timeout:g}s") from e
+        return cols, [tuple(r) for r in rows]
+
+    def stream(self, sql: str, batch: int = 10_000):
+        tx = self.con.transaction()
+        tx.__enter__()
+        cur = self.con.cursor(name="sb_stream")
+        cur.execute(sql)
+        cols = [d.name for d in cur.description]
+
+        def rows():
+            try:
+                while chunk := cur.fetchmany(batch):
+                    yield from (tuple(r) for r in chunk)
+            finally:
+                cur.close()
+                tx.__exit__(None, None, None)
+        return cols, rows()
+
+    def describe(self, table: str):
+        with self.con.cursor() as cur:
+            cur.execute(
+                "SELECT column_name, data_type FROM information_schema.columns "
+                "WHERE table_schema = %s AND table_name = %s ORDER BY ordinal_position", (self.schema, table))
+            return [(r[0], r[1]) for r in cur.fetchall()]
+
+    def tables(self):
+        with self.con.cursor() as cur:
+            cur.execute("SELECT table_name FROM information_schema.tables "
+                        "WHERE table_schema = %s AND table_type = 'BASE TABLE' ORDER BY 1", (self.schema,))
+            return [r[0] for r in cur.fetchall()]
+
+    def create_table_as(self, name: str, select: str) -> None:
+        t = ident(name)
+        with self.con.transaction(), self.con.cursor() as cur:
+            cur.execute(f"DROP TABLE IF EXISTS {t}")
+            cur.execute(f"CREATE TABLE {t} AS\n{select}")
+
+    def _reader(self, src: dict, location: str):
+        import duckdb
+
+        con = duckdb.connect()
+        return con, duck_reader(con, src, location)
+
+    def load_source(self, src: dict, location: str) -> dict:
+        con, reader = self._reader(src, location)
+        try:
+            schema = con.execute(f"DESCRIBE SELECT * FROM {reader}").fetchall()
+            cols = [(r[0], pg_load_type(r[1])) for r in schema]
+            names = ", ".join(ident(c) for c, _ in cols)
+            t = ident(src["name"])
+            exists = src["name"] in self.tables()
+            incremental = src.get("mode") == "incremental" and exists
+            with self.con.transaction(), self.con.cursor() as cur:
+                if incremental:
+                    c = ident(src["cursor"])
+                    cur.execute(f"SELECT COUNT(*), MAX({c}) FROM {t}")
+                    before, cursor_max = cur.fetchone()
+                    src_cur = con.execute(f"SELECT * FROM {reader} WHERE {c} > ? OR ? IS NULL", [cursor_max, cursor_max])
+                else:
+                    before = 0
+                    cur.execute(f"DROP TABLE IF EXISTS {t}")
+                    cur.execute(f"CREATE TABLE {t} ({', '.join(f'{ident(c)} {ty}' for c, ty in cols)})")
+                    src_cur = con.execute(f"SELECT * FROM {reader}")
+                with cur.copy(f"COPY {t} ({names}) FROM STDIN") as cp:
+                    while chunk := src_cur.fetchmany(10_000):
+                        for r in chunk:
+                            cp.write_row(r)
+                cur.execute(f"SELECT COUNT(*) FROM {t}")
+                rows = cur.fetchone()[0]
+            return {"rows": rows, "added": rows - before}
+        finally:
+            duck_detach(con, src)
+            con.close()
+
+    def preview(self, src: dict, location: str, limit: int = 20) -> dict:
+        con, reader = self._reader(src, location)
+        try:
+            schema = con.execute(f"DESCRIBE SELECT * FROM {reader}").fetchall()
+            cur = con.execute(f"SELECT * FROM {reader} LIMIT {int(limit)}")
+            return {"columns": [{"name": r[0], "type": r[1]} for r in schema],
+                    "rows": [list(r) for r in cur.fetchall()]}
+        finally:
+            duck_detach(con, src)
+            con.close()
+
+    def close(self) -> None:
+        self.con.close()
+
+
+# ---------------------------------------------------------------- Snowflake
 
 class SnowflakeWarehouse(Warehouse):
     """Untested against a live account yet: needs a Snowflake trial and credentials."""
@@ -238,6 +414,9 @@ class SnowflakeWarehouse(Warehouse):
         cur.execute("SHOW TERSE TABLES")
         return sorted(r[1].lower() for r in cur.fetchall())
 
+    def create_table_as(self, name: str, select: str) -> None:
+        self.con.cursor().execute(f"CREATE OR REPLACE TABLE {bare(name)} AS\n{select}")
+
     def load_source(self, src: dict, location: str) -> dict:
         connector = src.get("connector", "csv")
         if connector not in ("csv", "parquet", "json") or src.get("mode") == "incremental" or is_remote(location):
@@ -260,15 +439,26 @@ class SnowflakeWarehouse(Warehouse):
         n = cur.fetchone()[0]
         return {"rows": n, "added": n}
 
+    def preview(self, src: dict, location: str, limit: int = 20) -> dict:
+        return DuckDBWarehouse(Path(":memory:")).preview(src, location, limit)
+
     def close(self) -> None:
         self.con.close()
 
+
+# ---------------------------------------------------------------- factory
 
 def connect(project, read_only: bool = False) -> Warehouse:
     cfg = project.project.get("warehouse", {})
     kind = cfg.get("kind", "duckdb")
     if kind == "duckdb":
         return DuckDBWarehouse(project.path(cfg.get("path") or f"data/{project.name}.duckdb"), read_only)
+    if kind == "postgres":
+        env = cfg.get("url_env") or "SCOREBASE_WAREHOUSE_URL"
+        url = os.environ.get(env) or os.environ.get("SCOREBASE_PG_URL")
+        if not url:
+            raise SystemExit(f"set {env} (or SCOREBASE_PG_URL) to a Postgres URL for the warehouse")
+        return PostgresWarehouse(url, cfg.get("schema") or "warehouse", read_only)
     if kind == "snowflake":
         # Read-only on Snowflake is the role's job: point SNOWFLAKE_ROLE at one with SELECT only.
         return SnowflakeWarehouse(cfg)
