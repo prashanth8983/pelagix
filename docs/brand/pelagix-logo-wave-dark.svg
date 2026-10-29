@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 200">
+  <g><defs><clipPath id="k0"><circle cx="100" cy="100" r="84"/></clipPath></defs><g clip-path="url(#k0)"><rect width="200" height="200" fill="#0A2350"/><path d="M0,118 C30,96 58,96 86,116 S142,136 200,108 V200 H0Z" fill="#12B5C9"/><path d="M0,140 C34,120 62,122 92,138 S150,156 200,132 V200 H0Z" fill="#0E5DB0"/></g><g transform="rotate(-28 104 74)"><path d="M58,74 C74,52 116,50 136,74 C116,98 74,96 58,74Z" fill="#19D3E0"/><path d="M132,74 L160,54 L152,74 L160,94Z" fill="#19D3E0"/><circle cx="72" cy="70" r="4.5" fill="#fff"/><circle cx="73" cy="70" r="2.25" fill="#0A2350"/></g></g>
+  <text x="218" y="134" font-family="Avenir Next, Avenir, Helvetica Neue, sans-serif" font-weight="700" font-size="104" letter-spacing="-2" fill="#F4F7FB">Pelagi<tspan fill="#12B5C9">x</tspan></text>
+</svg>
