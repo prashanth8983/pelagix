@@ -20,6 +20,7 @@ from langgraph.graph import END, START, StateGraph
 from . import evaluate, sqlguard
 
 MAX_ATTEMPTS = 3
+DIALECTS = {"duckdb": "DuckDB", "snowflake": "Snowflake"}
 
 
 class State(TypedDict, total=False):
@@ -57,13 +58,14 @@ def build(project, llm, run_query: Callable[[str], dict]):
     context = describe_model(project)
     tables = evaluate.allowed_tables(project)
     entity = project.project.get("entity", "entity")
+    dialect = project.project.get("warehouse", {}).get("kind", "duckdb")
 
     def write_sql(s: State) -> State:
         retry = ""
         if s.get("error"):
             retry = f"\n\nYour previous SQL:\n{s['sql']}\nfailed with: {s['error']}\nFix it."
         prompt = (
-            f"Write one DuckDB SELECT that answers a marketer's question about {entity}s.\n"
+            f"Write one {DIALECTS[dialect]} SELECT that answers a business user's question about {entity}s.\n"
             f"Prefer the precomputed {project.score_table} table. Use business terms exactly as defined. "
             "Never invent tables or columns. Reply with only the SQL in a ```sql block.\n\n"
             f"{context}\n\nQUESTION: {s['question']}{retry}"
@@ -74,7 +76,7 @@ def build(project, llm, run_query: Callable[[str], dict]):
 
     def check(s: State) -> State:
         try:
-            return {"sql": sqlguard.check(s["sql"], tables, "duckdb"), "trace": s["trace"] + ["check: ok"]}
+            return {"sql": sqlguard.check(s["sql"], tables, dialect), "trace": s["trace"] + ["check: ok"]}
         except sqlguard.UnsafeSQL as e:
             return {"error": f"blocked: {e}", "trace": s["trace"] + [f"check: {e}"]}
 
