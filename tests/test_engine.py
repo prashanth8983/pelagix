@@ -196,7 +196,7 @@ def test_retail_pipeline(retail):
     counts = ingest.run(p, wh)
     assert counts["users"] == 800
     ingest.check(p, wh)
-    n = scorer.run(p, wh)
+    n = scorer.run(p, wh)["rows"]
     assert n == 800, "every user gets a row, buyers or not"
     _, rows = wh.query("SELECT COUNT(*) FROM entity_scores WHERE order_count = 0 AND total_spend = 0 AND ltv = 0")
     assert rows[0][0] > 0, "non-buyers get their scores' defaults"
@@ -214,6 +214,8 @@ def test_retail_segments_and_golden(retail):
     sizes = {s["name"]: s["size"] for s in segs}
     assert sizes["vip_lapsing"] <= sizes["vip"]
     assert sizes["all"] == 800
+    assert sizes["vip_texas"] <= sizes["vip"], "attribute rules combine with score rules"
+    assert sizes["email_or_organic"] >= 1
     assert all(r["ok"] for r in evaluate.run(p, wh))
 
 
@@ -222,7 +224,9 @@ def test_codegen_matches_the_score_table(retail):
     ts = codegen.render(p, wh)
     assert 'table("entity_scores")' in ts and 'primaryKey("user_id")' in ts
     assert "churn_risk: number().optional()," in ts
+    assert "state: string().optional()," in ts, "attributes are text columns in the Zero schema"
     assert '"highlight": "churn_risk"' in ts
+    assert '"state": "string"' in ts and '"ltv": "number"' in ts
 
 
 # The two tests below need the writer closed, so they run last among the retail tests.
@@ -281,7 +285,7 @@ def test_engine_is_generic(tmp_path):
     wh = warehouse.connect(p)
     try:
         ingest.run(p, wh)
-        assert scorer.run(p, wh) == 2
+        assert scorer.run(p, wh)["rows"] == 2
         _, rows = wh.query("SELECT country, unemployment_change FROM entity_scores ORDER BY country")
         assert rows == [("UK", -0.2), ("US", 0.2)]
     finally:
