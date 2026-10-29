@@ -1,4 +1,8 @@
-# Local app database. wal_level=logical is what Zero needs to replicate Postgres to the browser.
+# `docker compose up -d` starts only Postgres, for local development (`make setup`).
+# `docker compose --profile stack up --build` runs the whole thing: Postgres, engine API,
+# zero-cache and the web app. See docs/deploy.md.
+#
+# wal_level=logical is what Zero needs to replicate Postgres to the browser.
 services:
   postgres:
     image: postgres:16-alpine
@@ -16,5 +20,67 @@ services:
       interval: 2s
       retries: 30
 
+  engine:
+    profiles: [stack]
+    build:
+      context: .
+      dockerfile: engine/Dockerfile
+    environment:
+      SCOREBASE_PROJECT: ${SCOREBASE_PROJECT:-retail}
+      SCOREBASE_PG_URL: postgresql://scorebase:scorebase@postgres:5432/scorebase
+      SCOREBASE_API_TOKEN: ${SCOREBASE_API_TOKEN:?set SCOREBASE_API_TOKEN (openssl rand -hex 24)}
+      SCOREBASE_REMOTE_SOURCES: ${SCOREBASE_REMOTE_SOURCES:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SCOREBASE_MODEL: ${SCOREBASE_MODEL:-}
+    volumes:
+      - ./data:/srv/scorebase/data
+      - ./configs:/srv/scorebase/configs
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  zero:
+    profiles: [stack]
+    build:
+      context: ./app
+      target: zero
+    environment:
+      ZERO_UPSTREAM_DB: postgresql://scorebase:scorebase@postgres:5432/scorebase
+      ZERO_REPLICA_FILE: /data/replica.db
+      ZERO_QUERY_URL: http://app:3000/api/zero/query
+      ZERO_QUERY_FORWARD_COOKIES: "true"
+      ZERO_ENABLE_CRUD_MUTATIONS: "false"
+      ZERO_PORT: "4848"
+    ports:
+      - "4848:4848"
+    volumes:
+      - zerodata:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    profiles: [stack]
+    build:
+      context: ./app
+      args:
+        # Baked into the browser bundle: the URL the browser uses to reach zero-cache.
+        VITE_ZERO_CACHE_URL: ${VITE_ZERO_CACHE_URL:-http://localhost:4848}
+    environment:
+      NODE_ENV: production
+      SCOREBASE_API_URL: http://engine:8787
+      SCOREBASE_PG_URL: postgresql://scorebase:scorebase@postgres:5432/scorebase
+      SCOREBASE_API_TOKEN: ${SCOREBASE_API_TOKEN:?set SCOREBASE_API_TOKEN (openssl rand -hex 24)}
+      VITE_ZERO_CACHE_URL: ${VITE_ZERO_CACHE_URL:-http://localhost:4848}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      engine:
+        condition: service_started
+
 volumes:
   pgdata:
+  zerodata:
