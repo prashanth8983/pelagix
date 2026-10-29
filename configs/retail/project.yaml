@@ -4,6 +4,7 @@ entity: customer          # what each score row describes
 key: user_id              # column that identifies the entity
 entity_table: users       # every row here gets scores, even customers who never ordered
 entity_key: id            # that table's key column
+attributes: [state, traffic_source]   # columns of users carried into the score table, filterable as text
 
 warehouse:
   kind: duckdb            # duckdb (local) | snowflake
@@ -12,10 +13,11 @@ warehouse:
 publish:
   postgres_url_env: SCOREBASE_PG_URL   # read from the environment, never stored here
   table: entity_scores
+  history: false          # true keeps entity_scores_history: one row per customer per run
 
 display:                  # how the app lists customers
   entity_label: Customers
-  columns: [ltv, total_spend, order_count, last_order_at]
+  columns: [ltv, total_spend, order_count, last_order_at, state]
   highlight: churn_risk
   default_sort: ltv
   sort_dir: desc
