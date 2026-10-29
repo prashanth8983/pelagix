@@ -63,6 +63,16 @@ const SCHEMA = `
     ip text
   );
   CREATE INDEX IF NOT EXISTS audit_at ON scorebase_auth.audit_log (at DESC);
+  CREATE TABLE IF NOT EXISTS scorebase_auth.login_failures (
+    key text PRIMARY KEY,
+    n int NOT NULL,
+    until timestamptz NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS scorebase_auth.rate_limits (
+    key text PRIMARY KEY,
+    window_start timestamptz NOT NULL,
+    n int NOT NULL
+  );
 `
 
 /** Create the auth tables once per process. Safe to call on every request. */
@@ -106,23 +116,38 @@ const ip = () => {
   }
 }
 
-// Five failed logins for an email (or from an address) in 15 minutes locks it for 15 minutes.
-const failures = new Map<string, { n: number; until: number }>()
-export function lockedOut(email: string): boolean {
-  const now = Date.now()
-  return [email.toLowerCase(), `ip:${ip()}`].some((k) => {
-    const f = failures.get(k)
-    return !!f && f.n >= 5 && f.until > now
-  })
+// Failed sign-ins are counted per email and per address in 15-minute windows. Five for an
+// email locks that email; twenty from one address locks the address (offices and test
+// runners share addresses). Counters live in Postgres so every app replica sees them.
+const LOCK_AFTER_EMAIL = 5
+const LOCK_AFTER_IP = 20
+const LOCK_MINUTES = 15
+const failureKeys = (email: string) => [email.toLowerCase(), `ip:${ip()}`]
+
+export async function lockedOut(email: string): Promise<boolean> {
+  const [emailKey, ipKey] = failureKeys(email)
+  const { rows } = await (await ready()).query(
+    `SELECT 1 FROM scorebase_auth.login_failures
+     WHERE until > now() AND ((key = $1 AND n >= $2) OR (key = $3 AND n >= $4)) LIMIT 1`,
+    [emailKey, LOCK_AFTER_EMAIL, ipKey, LOCK_AFTER_IP])
+  return rows.length > 0
 }
-export function noteFailure(email: string) {
-  const now = Date.now()
-  for (const k of [email.toLowerCase(), `ip:${ip()}`]) {
-    const f = failures.get(k)
-    failures.set(k, !f || f.until < now ? { n: 1, until: now + 15 * 60_000 } : { n: f.n + 1, until: f.until })
+
+export async function noteFailure(email: string) {
+  const pool = await ready()
+  for (const key of failureKeys(email)) {
+    await pool.query(
+      `INSERT INTO scorebase_auth.login_failures (key, n, until) VALUES ($1, 1, now() + make_interval(mins => $2))
+       ON CONFLICT (key) DO UPDATE SET
+         n = CASE WHEN login_failures.until < now() THEN 1 ELSE login_failures.n + 1 END,
+         until = CASE WHEN login_failures.until < now() THEN now() + make_interval(mins => $2) ELSE login_failures.until END`,
+      [key, LOCK_MINUTES])
   }
 }
-export const clearFailures = (email: string) => failures.delete(email.toLowerCase())
+
+export async function clearFailures(email: string) {
+  await (await ready()).query('DELETE FROM scorebase_auth.login_failures WHERE key = $1', [email.toLowerCase()])
+}
 
 export async function startSession(userId: string) {
   const pool = await ready()
