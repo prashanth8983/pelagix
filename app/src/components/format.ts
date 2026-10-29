@@ -1,8 +1,15 @@
+import { SCORES } from '~/generated/project'
+
 const usd0 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+const usd2 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
 const int = new Intl.NumberFormat('en-US')
+const dec = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
+const compact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
+const day = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
 export const money = (v?: number | null) => (v == null ? '—' : usd0.format(v))
 export const count = (v?: number | null) => (v == null ? '—' : int.format(v))
+export const short = (v?: number | null) => (v == null ? '—' : compact.format(v))
 
 export function ago(epochMs?: number | null): string {
   if (epochMs == null) return '—'
@@ -18,3 +25,30 @@ export function cell(v: unknown): string {
   if (typeof v === 'number') return Number.isInteger(v) ? int.format(v) : int.format(Math.round(v * 100) / 100)
   return String(v)
 }
+
+/** A value shown the way its score's `format` says. */
+export function formatValue(format: string | undefined, v: unknown, opts: { precise?: boolean } = {}): string {
+  if (v == null) return '—'
+  if (typeof v !== 'number') return String(v)
+  switch (format) {
+    case 'money':
+      return (opts.precise ? usd2 : usd0).format(v)
+    case 'count':
+      return int.format(v)
+    case 'ratio':
+      return `${Math.round(v * 100)}%`
+    case 'percent':
+      return `${dec.format(v)}%`
+    case 'days':
+      return `${int.format(v)}d`
+    case 'date':
+      return opts.precise ? day.format(new Date(v)) : ago(v)
+    default:
+      return Number.isInteger(v) ? int.format(v) : dec.format(v)
+  }
+}
+
+export const formatScore = (name: string, v: unknown, opts?: { precise?: boolean }) =>
+  formatValue(SCORES[name]?.format, v, opts)
+
+export const scoreLabel = (name: string) => SCORES[name]?.label ?? name.replace(/_/g, ' ')

@@ -1,37 +1,44 @@
 import { useServerFn } from '@tanstack/react-start'
-import { useEffect, useState } from 'react'
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { ArrowUp, BadgeCheck, ChevronDown, Code2, Sparkles, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useMe } from '~/lib/session'
 import { ask, type AskResponse } from '~/server/ask'
-import { cell } from './format'
+import { saveSection } from '~/server/config'
+import { useConfig } from './config/state'
+import { ResultView } from './ResultView'
+import { useToast } from './Toaster'
+import { SqlBlock } from './Sql'
+import { Badge, Button, Spinner, cx } from './ui'
 
-const SUGGESTIONS = [
-  'Show high-value customers who haven’t ordered in 60 days',
-  'Which traffic source brings the highest lifetime value?',
-  'What is the churn risk distribution?',
-]
-
-// Two columns, the second numeric, few rows: draw it as a bar chart.
-function chartable(r: AskResponse) {
-  if (!r.columns || !r.rows || r.columns.length !== 2 || r.rows.length < 2 || r.rows.length > 30) return false
-  return r.rows.every((row) => typeof row[1] === 'number')
-}
-
-export function AskBox() {
+export function AskBox({ initial }: { initial?: string }) {
   const run = useServerFn(ask)
-  const [q, setQ] = useState('')
+  const save = useServerFn(saveSection)
+  const { config, reload } = useConfig()
+  const { can } = useMe()
+  const toast = useToast()
+  const [q, setQ] = useState(initial ?? '')
+  const [asked, setAsked] = useState('')
   const [busy, setBusy] = useState(false)
   const [res, setRes] = useState<AskResponse | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [showSql, setShowSql] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [focused, setFocused] = useState(false)
   // Until React has hydrated, Enter would do a native form GET and reload the page.
   const [ready, setReady] = useState(false)
+  const input = useRef<HTMLInputElement>(null)
   useEffect(() => setReady(true), [])
+
+  const suggestions = (config?.golden ?? []).slice(0, 4).map((g) => g.question)
 
   const submit = async (question: string) => {
     if (!question.trim()) return
     setQ(question)
+    setAsked(question.trim())
     setBusy(true)
     setErr(null)
+    setSaved(false)
+    setShowSql(false)
     try {
       setRes(await run({ data: { question } }))
     } catch (e) {
@@ -40,34 +47,57 @@ export function AskBox() {
       setBusy(false)
     }
   }
+  useEffect(() => {
+    if (initial && ready) submit(initial)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial, ready])
+
+  // A checked agent answer becomes a verified query: answered instantly and exactly next
+  // time, and one more example for the agent.
+  const verify = async () => {
+    if (!config || !res?.sql) return
+    const r = await save({ data: { section: 'golden', data: [...config.golden, { question: asked, sql: res.sql }] } })
+    if (r.errors.length) toast({ title: 'Not saved', description: r.errors.join('; '), tone: 'danger' })
+    else {
+      setSaved(true)
+      reload()
+      toast({ title: 'Saved as a verified query', description: 'This question is now answered with this SQL.', tone: 'success' })
+    }
+  }
 
   return (
-    <section className="rounded-xl border border-line bg-white">
+    <section className={cx('rounded-lg border bg-surface transition-[border-color,box-shadow]', focused ? 'border-accent ring-3 ring-ring' : 'border-line')}>
       <form
         onSubmit={(e) => {
           e.preventDefault()
           submit(q)
         }}
-        className="flex items-center gap-3 px-5 py-4"
+        className="flex items-center gap-3 px-4"
       >
-        <span className="text-muted">✦</span>
+        <Sparkles className="size-4 shrink-0 text-faint" strokeWidth={1.75} />
         <input
+          ref={input}
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           disabled={!ready}
-          placeholder="Ask anything about your customers…"
-          className="flex-1 bg-transparent text-[15px] outline-none placeholder:text-gray-400"
+          placeholder="Ask a question about your data"
+          className="h-12 flex-1 bg-transparent text-[14px] outline-none placeholder:text-faint"
         />
-        <kbd className="rounded border border-line px-1.5 text-xs text-muted">{busy ? '…' : '↵'}</kbd>
+        {res && !busy && (
+          <Button variant="ghost" size="sm" aria-label="Clear" icon={<X />} onClick={() => { setRes(null); setQ(''); setErr(null); input.current?.focus() }} />
+        )}
+        <Button type="submit" variant="primary" size="sm" aria-label="Ask" disabled={!ready || !q.trim()} loading={busy} icon={<ArrowUp />} />
       </form>
 
-      {!res && !busy && (
-        <div className="flex flex-wrap gap-2 border-t border-line px-5 py-3">
-          {SUGGESTIONS.map((s) => (
+      {!res && !busy && !err && suggestions.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 border-t border-line px-4 py-2.5">
+          {suggestions.map((s) => (
             <button
               key={s}
               onClick={() => submit(s)}
-              className="rounded-full border border-line px-3 py-1 text-[13px] text-muted hover:border-gray-300 hover:text-ink"
+              className="h-7 rounded-md border border-line px-2.5 text-[12px] text-muted transition-colors hover:border-line-strong hover:text-fg"
             >
               {s}
             </button>
@@ -75,62 +105,51 @@ export function AskBox() {
         </div>
       )}
 
-      {err && <p className="border-t border-line px-5 py-3 text-sm text-risk">{err}</p>}
+      {busy && (
+        <div className="flex items-center gap-2 border-t border-line px-4 py-3 text-[13px] text-muted">
+          <Spinner /> Working on “{asked}”
+        </div>
+      )}
+      {err && <p className="border-t border-line px-4 py-3 text-[13px] text-danger">{err}</p>}
 
-      {res && (
-        <div className="border-t border-line px-5 py-4">
+      {res && !busy && (
+        <div className="anim-fade border-t border-line px-4 py-4">
           <div className="flex items-start justify-between gap-4">
-            <p className="text-[15px]">{res.answer.replace(/\*\*/g, '')}</p>
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                res.source === 'verified' ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-accent'
-              }`}
-            >
-              {res.source === 'verified' ? 'Verified query' : res.source === 'agent' ? `AI generated · ${res.engine ?? 'agent'}` : 'No answer'}
-            </span>
+            <p className="text-[14px] leading-relaxed">{res.answer.replace(/\*\*/g, '')}</p>
+            {res.source === 'verified' ? <Badge tone="success"><BadgeCheck className="size-3" />Verified</Badge>
+              : res.source === 'agent' ? <Badge tone="accent">Generated</Badge>
+              : <Badge>No answer</Badge>}
           </div>
 
-          {res.rows && chartable(res) && (
-            <div className="mt-4 h-56">
-              <ResponsiveContainer>
-                <BarChart data={res.rows.map((r) => ({ k: String(r[0]), v: r[1] as number }))}>
-                  <XAxis dataKey="k" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={48} />
-                  <Tooltip cursor={{ fill: '#f4f4f5' }} />
-                  <Bar dataKey="v" name={res.columns![1]} fill="#4f46e5" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          {res.closest && (
+            <button onClick={() => submit(res.closest!)} className="mt-2 text-[13px] text-accent hover:underline">
+              Ask “{res.closest}” instead
+            </button>
           )}
 
-          {res.rows && !chartable(res) && (
-            <div className="mt-4 max-h-72 overflow-auto rounded-lg border border-line">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-gray-50 text-left text-[12px] text-muted">
-                  <tr>{res.columns!.map((c) => <th key={c} className="px-3 py-2 font-medium">{c}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {res.rows.slice(0, 100).map((row, i) => (
-                    <tr key={i} className="border-t border-line/70">
-                      {row.map((v, j) => <td key={j} className="num px-3 py-1.5">{cell(v)}</td>)}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {res.columns && res.rows && <div className="mt-4"><ResultView key={res.sql ?? asked} columns={res.columns} rows={res.rows} name="answer" /></div>}
 
           {res.sql && (
-            <div className="mt-3">
-              <button onClick={() => setShowSql(!showSql)} className="text-[13px] text-muted hover:text-ink">
-                {showSql ? 'Hide SQL' : 'Show SQL'} · {res.rows?.length ?? 0} rows
-              </button>
-              {showSql && (
-                <pre className="mt-2 overflow-auto rounded-lg bg-gray-50 p-3 text-[12px] leading-relaxed text-gray-700">
-                  {res.sql}
-                </pre>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="ghost" icon={<Code2 />} onClick={() => setShowSql(!showSql)} className="-ml-2" aria-expanded={showSql}>
+                {showSql ? 'Hide SQL' : 'View SQL'}
+                <ChevronDown className={cx('transition-transform', showSql && 'rotate-180')} />
+              </Button>
+              <span className="text-[12px] text-faint">{res.rows?.length ?? 0} rows{res.attempts ? ` · ${res.attempts} attempt${res.attempts > 1 ? 's' : ''}` : ''}</span>
+              {res.source === 'agent' && can('editor') && !saved && (
+                <Button size="sm" className="ml-auto" icon={<BadgeCheck />} onClick={verify} title="Check the SQL first: verified answers are shown as exact">
+                  Save as verified
+                </Button>
               )}
             </div>
+          )}
+          {showSql && res.sql && (
+            <SqlBlock
+              className="anim-fade mt-2"
+              sql={res.sql}
+              label={res.source === 'verified' ? 'Verified query' : 'Generated query'}
+              meta={res.source === 'verified' ? res.matched : 'Checked by the SQL guard before it ran'}
+            />
           )}
         </div>
       )}

@@ -1,36 +1,48 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
+import { z } from 'zod'
 import { AskBox } from '~/components/AskBox'
+import { Distribution } from '~/components/Distribution'
+import { ago, count } from '~/components/format'
 import { MembersTable } from '~/components/MembersTable'
 import { SegmentCards, type Segment } from '~/components/Segments'
 import { ZeroShell } from '~/components/ZeroShell'
+import { useRuns } from '~/components/config/state'
+import { PageHeader, Skeleton } from '~/components/ui'
+import { PROJECT } from '~/generated/project'
 
-export const Route = createFileRoute('/')({ component: Home })
+export const Route = createFileRoute('/')({
+  validateSearch: z.object({ q: z.string().max(500).optional() }),
+  component: Home,
+})
 
-const ALL: Segment = { name: 'all', label: 'Customers', rules: [], size: 0 }
+const ALL: Segment = { name: 'all', label: PROJECT.entityLabel, rules: [], size: 0 }
 
 function Home() {
+  const { q } = Route.useSearch()
   const [segment, setSegment] = useState<Segment>(ALL)
+  const { runs } = useRuns()
+  const lastOk = runs.find((r) => r.status === 'ok' && r.steps.some((s) => s.step === 'publish'))
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-line bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-2 font-semibold tracking-tight">
-            <span className="grid h-6 w-6 place-items-center rounded-md bg-ink text-[11px] text-white">S</span>
-            Scorebase
-          </div>
-          <span className="text-[13px] text-muted">Retail · demo data</span>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-6xl space-y-5 px-6 py-8">
-        <AskBox />
-        <ZeroShell fallback={<p className="text-sm text-muted">Connecting to sync…</p>}>
+    <>
+      <PageHeader
+        title="Overview"
+        description={
+          <>
+            {segment.size ? `${count(segment.size)} ${PROJECT.entityLabel.toLowerCase()}` : PROJECT.entityLabel}
+            {lastOk?.finished_at && <> · published {ago(lastOk.finished_at * 1000)}</>}
+          </>
+        }
+      />
+      <div className="space-y-6">
+        <AskBox key={q} initial={q} />
+        <ZeroShell fallback={<div className="space-y-6"><Skeleton className="h-[78px]" /><Skeleton className="h-96" /></div>}>
           <SegmentCards selected={segment.name} onSelect={setSegment} />
           <MembersTable segment={segment} />
         </ZeroShell>
-      </main>
-    </div>
+        <Distribution />
+      </div>
+    </>
   )
 }
