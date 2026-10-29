@@ -4,7 +4,12 @@ import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
 import { describeModel, getContext, runSql, type QueryResult } from './scorebase'
 
-const MODEL = process.env.SCOREBASE_MODEL ?? 'anthropic/claude-sonnet-5-5'
+// Any provider Mastra's model router knows. OpenRouter if its key is set, else Anthropic.
+// Override with SCOREBASE_MODEL, e.g. openrouter/openai/gpt-oss-120b.
+const MODEL =
+  process.env.SCOREBASE_MODEL ??
+  (process.env.OPENROUTER_API_KEY ? 'openrouter/anthropic/claude-sonnet-4-6' : 'anthropic/claude-sonnet-5-5')
+
 
 export async function askAgent(question: string): Promise<{ answer: string; result?: QueryResult }> {
   const ctx = await getContext()

@@ -20,7 +20,7 @@ export const ask = createServerFn({ method: 'POST' })
   .validator(z.object({ question: z.string().min(2).max(500) }))
   .handler(async ({ data }): Promise<AskResponse> => {
     const { matchGolden, runSql } = await import('./scorebase')
-    const hasKey = Boolean(process.env.ANTHROPIC_API_KEY)
+    const hasKey = Boolean(process.env.OPENROUTER_API_KEY || process.env.ANTHROPIC_API_KEY)
 
     const match = await matchGolden(data.question)
     if ('sql' in match && (match.score >= GOLDEN_THRESHOLD || (!hasKey && match.score > 0))) {
@@ -36,7 +36,7 @@ export const ask = createServerFn({ method: 'POST' })
     if (!hasKey) {
       return {
         source: 'none',
-        answer: 'No verified query matches that question. Set ANTHROPIC_API_KEY to let the agent write new SQL.',
+        answer: 'No verified query matches that question. Set OPENROUTER_API_KEY (or ANTHROPIC_API_KEY) in app/.env to let the agent write new SQL.',
       }
     }
 
