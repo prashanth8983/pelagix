@@ -1,5 +1,6 @@
 """scorebase CLI.
 
+  python -m scorebase init <name>                   a new, valid project under configs/<name>/
   python -m scorebase generate retail [--users N]   synthetic TheLook-shaped files
   python -m scorebase run retail [--no-publish]     load -> check -> score -> segments -> publish -> codegen
   python -m scorebase validate retail               check every config file and their references
@@ -56,13 +57,18 @@ def cmd_run(p, args):
             print(f"[{p.name}] warehouse={wh.dialect}")
         _step("load", lambda: ingest.run(p, wh), j)
         _step("check", lambda: ingest.check(p, wh), j)
-        _step("score", lambda: f"{scorer.run(p, wh)} rows in {p.score_table}", j)
+        _step("score", lambda: scorer.run(p, wh), j)
         segs = _step("segments", lambda: segments.run(p, wh), j)
         if not args.no_publish:
             _step("publish", lambda: publish.run(p, wh, segs), j)
             _step("codegen", lambda: "app schema updated" if codegen.write(p, wh) else "app schema unchanged", j)
     finally:
         wh.close()
+
+
+def cmd_init(args):
+    d = config.init(args.name)
+    print(f"created {d}\n  edit the YAML files there, put data under {config.ROOT / 'data'}, then: scorebase run {args.name}")
 
 
 def cmd_validate(p, args):
@@ -139,6 +145,7 @@ def cmd_codegen(p, args):
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="scorebase")
     sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("init").add_argument("name")
     g = sub.add_parser("generate"); g.add_argument("project")
     g.add_argument("--users", type=int, default=20000); g.add_argument("--seed", type=int, default=7)
     r = sub.add_parser("run"); r.add_argument("project"); r.add_argument("--no-publish", action="store_true")
@@ -148,6 +155,8 @@ def main(argv=None):
     for name in ("validate", "show-sql", "codegen"):
         sub.add_parser(name).add_argument("project")
     args = ap.parse_args(argv)
+    if args.cmd == "init":
+        return cmd_init(args)
 
     p = config.load(args.project)
     {"generate": cmd_generate, "run": cmd_run, "sql": cmd_sql, "eval": cmd_eval, "validate": cmd_validate,
