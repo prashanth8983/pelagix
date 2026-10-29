@@ -99,7 +99,7 @@ function Runs() {
     <>
       <PageHeader
         title="Pipeline runs"
-        description="Load, check, score, segment, publish. A failed check stops the run before publishing."
+        description="A failed check stops a run before it publishes."
         actions={can('editor') && (
           <>
             <Button icon={<FlaskConical />} disabled={running} onClick={async () => setErrors((await start(false)) ?? [])}>Dry run</Button>
