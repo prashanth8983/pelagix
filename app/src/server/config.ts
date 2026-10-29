@@ -66,7 +66,7 @@ export type ScoresPreview = {
   errors?: string[]
   error?: string
   sql: string
-  plan: { name: string; layer: number; depends_on: string[] }[]
+  plan: { name: string; layer: number; depends_on: string[]; group: number | null }[]
   columns?: string[]
   rows?: QueryResult['rows']
   stats?: Record<string, string | number | null>[]
@@ -80,11 +80,15 @@ export const previewScores = createServerFn({ method: 'POST' })
     return attempt(() => call<ScoresPreview>('/preview/scores', data))
   })
 
+const scalar = z.union([z.number(), z.string()])
 export const previewSegment = createServerFn({ method: 'POST' })
-  .validator(z.object({ rules: z.array(z.object({ column: z.string(), op: z.string(), value: z.number() })) }))
+  .validator(z.object({
+    match: z.enum(['all', 'any']).default('all'),
+    rules: z.array(z.object({ column: z.string(), op: z.string(), value: z.union([scalar, z.array(scalar), z.null()]).optional() })).max(8),
+  }))
   .handler(async ({ data }) => {
     const user = await guard('viewer')
-    ;(await import('./ratelimit')).limit(user.id, 'query')
+    await (await import('./ratelimit')).limit(user.id, 'query')
     const { call } = await api()
     return call<{ errors?: string[]; where?: string; size?: number; total?: number }>('/preview/segment', data)
   })
@@ -99,7 +103,7 @@ export const runQuery = createServerFn({ method: 'POST' })
   .validator(z.object({ sql: z.string().min(1).max(20_000) }))
   .handler(async ({ data }) => {
     const user = await guard('viewer')
-    ;(await import('./ratelimit')).limit(user.id, 'query')
+    await (await import('./ratelimit')).limit(user.id, 'query')
     const { runSql } = await api()
     return runSql(data.sql)
   })
@@ -142,18 +146,13 @@ export const startRun = createServerFn({ method: 'POST' })
     return r
   })
 
-// One score's distribution for the overview chart: 20 equal-width bins up to the 99th
-// percentile, so a long tail doesn't squash everything into the first bar.
+// One score's distribution for the overview chart. The engine builds the histogram SQL
+// for its warehouse dialect; the result goes through the same guard as any query.
 export const distribution = createServerFn({ method: 'POST' })
-  .validator(z.object({ column: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/), table: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/) }))
+  .validator(z.object({ column: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/), bins: z.number().int().min(2).max(100).default(20) }))
   .handler(async ({ data }) => {
     const user = await guard('viewer')
-    ;(await import('./ratelimit')).limit(user.id, 'query')
-    const { runSql } = await api()
-    const c = data.column
-    return runSql(`WITH v AS (SELECT CAST(${c} AS DOUBLE) AS x FROM ${data.table} WHERE ${c} IS NOT NULL),
-      b AS (SELECT MIN(x) AS lo, QUANTILE_CONT(x, 0.99) AS hi FROM v)
-      SELECT LEAST(CAST(FLOOR((x - lo) / NULLIF((hi - lo) / 20, 0)) AS INTEGER), 19) AS bin,
-             MIN(x) AS lo, MAX(x) AS hi, COUNT(*) AS n
-      FROM v, b GROUP BY 1 ORDER BY 1`)
+    await (await import('./ratelimit')).limit(user.id, 'query')
+    const { call } = await api()
+    return call<QueryResult>('/distribution', data)
   })
