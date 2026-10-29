@@ -12,6 +12,9 @@ tables:
       ltv: Lifetime value estimate, USD
       churn_risk: Risk of leaving, 0 to 1
       ltv_decile: LTV decile among buyers, 10 = top (NULL for customers who never bought)
+      web_sessions: Site visits recorded in the events table
+      state: US state (from users)
+      traffic_source: Acquisition channel (from users)
   users:
     description: Customer profile
     columns:
@@ -35,6 +38,12 @@ tables:
       product_id: Product id
       sale_price: Price paid, USD
       status: Item status
+  events:
+    description: One row per site visit
+    columns:
+      user_id: Customer id
+      event_type: home, department, product, cart or purchase
+      created_at: Visit time
   products:
     description: Product catalog
     columns:
@@ -49,6 +58,7 @@ joins:
   - orders.user_id = users.id
   - order_items.order_id = orders.order_id
   - order_items.product_id = products.id
+  - events.user_id = users.id
 
 synonyms:
   spend: "SUM(order_items.sale_price) counting only items whose status is NOT IN ('Cancelled', 'Returned')"
