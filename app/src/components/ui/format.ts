@@ -1,4 +1,4 @@
-import { SCORES } from '~/generated/project'
+import { ATTRIBUTE_META, SCORES } from '~/generated/project'
 
 const usd0 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 const usd2 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
@@ -48,7 +48,10 @@ export function formatValue(format: string | undefined, v: unknown, opts: { prec
   }
 }
 
+/** Format any score-table column: scores by their format, attributes as text. */
 export const formatScore = (name: string, v: unknown, opts?: { precise?: boolean }) =>
-  formatValue(SCORES[name]?.format, v, opts)
+  name in SCORES ? formatValue(SCORES[name].format, v, opts) : v == null ? '—' : String(v)
 
-export const scoreLabel = (name: string) => SCORES[name]?.label ?? name.replace(/_/g, ' ')
+export const isAttribute = (name: string) => name in ATTRIBUTE_META
+
+export const scoreLabel = (name: string) => SCORES[name]?.label ?? ATTRIBUTE_META[name]?.label ?? name.replace(/_/g, ' ')
