@@ -27,7 +27,7 @@ make data           # 20K synthetic customers → scores → Postgres
 make api            # terminal 1: query API   :8787
 make zero           # terminal 2: Zero sync   :4848
 make app            # terminal 3: web app     :3000
-make test           # 13 engine tests, 5/5 golden queries, app typecheck
+make test           # 15 tests, 5/5 golden queries, app typecheck
 ```
 
 Optional: put `OPENROUTER_API_KEY=...` (or `ANTHROPIC_API_KEY`) in `app/.env` so the Ask box can answer questions that no verified query covers.
@@ -36,12 +36,13 @@ Optional: put `OPENROUTER_API_KEY=...` (or `ANTHROPIC_API_KEY`) in `app/.env` so
 
 | Check | Result |
 |---|---|
-| Engine tests (scorer layering, cycles, SQL guard, end-to-end, second domain) | 13/13 |
+| Engine + agent tests | 15/15 |
 | Golden queries through the guard | 5/5 |
 | Re-publish with no changes | 0 rows written |
 | Edit one row in Postgres | shows in the open page in ~1.5s, no reload |
 | Ask box, verified path | answers + Show SQL in the browser |
-| Ask box, agent path (Mastra + Claude via OpenRouter) | answered an unseen question with a correct 3-table join, checked against the engine |
+| Ask box, agent path: Mastra (TS) or LangGraph (Python), `SCOREBASE_AGENT` | both answered unseen questions correctly via OpenRouter, numbers checked against the engine |
+| LangGraph control flow (guard retry, give-up after 3) | 2 offline tests with a scripted fake model |
 | Snowflake warehouse | code written; not yet run, needs an account |
 
 ## Notes

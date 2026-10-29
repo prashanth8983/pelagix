@@ -39,6 +39,11 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 let cached: Context | undefined
 export const getContext = async () => (cached ??= await call<Context>('/context'))
 export const runSql = (sql: string) => call<QueryResult>('/query', { sql })
+export const askGraph = (question: string) =>
+  call<{ answer: string; sql?: string; columns?: string[]; rows?: QueryResult['rows']; attempts?: number; trace?: string[] }>(
+    '/ask',
+    { question },
+  )
 export const matchGolden = (question: string) =>
   call<(Golden & { score: number }) | Record<string, never>>('/match', { question })
 

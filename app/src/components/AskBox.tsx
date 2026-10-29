@@ -1,5 +1,5 @@
 import { useServerFn } from '@tanstack/react-start'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ask, type AskResponse } from '~/server/ask'
 import { cell } from './format'
@@ -23,6 +23,9 @@ export function AskBox() {
   const [res, setRes] = useState<AskResponse | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [showSql, setShowSql] = useState(false)
+  // Until React has hydrated, Enter would do a native form GET and reload the page.
+  const [ready, setReady] = useState(false)
+  useEffect(() => setReady(true), [])
 
   const submit = async (question: string) => {
     if (!question.trim()) return
@@ -51,6 +54,7 @@ export function AskBox() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          disabled={!ready}
           placeholder="Ask anything about your customers…"
           className="flex-1 bg-transparent text-[15px] outline-none placeholder:text-gray-400"
         />
@@ -82,7 +86,7 @@ export function AskBox() {
                 res.source === 'verified' ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-accent'
               }`}
             >
-              {res.source === 'verified' ? 'Verified query' : res.source === 'agent' ? 'AI generated' : 'No answer'}
+              {res.source === 'verified' ? 'Verified query' : res.source === 'agent' ? `AI generated · ${res.engine ?? 'agent'}` : 'No answer'}
             </span>
           </div>
 

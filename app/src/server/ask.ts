@@ -9,6 +9,8 @@ export type AskResponse = {
   source: 'verified' | 'agent' | 'none'
   answer: string
   matched?: string
+  engine?: 'mastra' | 'langgraph'
+  attempts?: number
   sql?: string
   columns?: string[]
   rows?: Cell[][]
@@ -40,7 +42,13 @@ export const ask = createServerFn({ method: 'POST' })
       }
     }
 
+    // SCOREBASE_AGENT=langgraph runs the Python LangGraph agent; default is Mastra in TypeScript.
+    if (process.env.SCOREBASE_AGENT === 'langgraph') {
+      const { askGraph } = await import('./scorebase')
+      const g = await askGraph(data.question)
+      return { source: 'agent', engine: 'langgraph', answer: g.answer, sql: g.sql, columns: g.columns, rows: g.rows, attempts: g.attempts }
+    }
     const { askAgent } = await import('./agent')
     const { answer, result } = await askAgent(data.question)
-    return { source: 'agent', answer, ...(result ?? {}) }
+    return { source: 'agent', engine: 'mastra', answer, ...(result ?? {}) }
   })
