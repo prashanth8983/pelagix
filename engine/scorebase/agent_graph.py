@@ -17,9 +17,10 @@ from typing import Any, Callable, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from . import evaluate, sqlguard
+from . import evaluate, golden, sqlguard
 
 MAX_ATTEMPTS = 3
+MAX_EXAMPLES = 8
 DIALECTS = {"duckdb": "DuckDB", "snowflake": "Snowflake"}
 
 
@@ -34,8 +35,17 @@ class State(TypedDict, total=False):
     trace: list[str]
 
 
-def describe_model(project) -> str:
-    """The semantic layer as prompt text (same content the Mastra agent gets)."""
+def pick_examples(examples: list[dict], question: str | None, k: int = MAX_EXAMPLES) -> list[dict]:
+    """The verified queries most like the question, so the prompt stays small as golden.yaml grows."""
+    if question is None or len(examples) <= k:
+        return examples
+    q = golden.words(question)
+    scored = sorted(examples, key=lambda g: -len(q & golden.words(g["question"])))
+    return scored[:k]
+
+
+def describe_model(project, question: str | None = None) -> str:
+    """The semantic layer as prompt text: tables, joins, business terms, and the closest examples."""
     m = project.model
     tables = "\n".join(
         f"  {name} -- {t.get('description', '')}\n"
@@ -44,7 +54,7 @@ def describe_model(project) -> str:
     )
     joins = "\n".join(f"  {j}" for j in m.get("joins", []))
     terms = "\n".join(f'  "{k}" means {v}' for k, v in m.get("synonyms", {}).items())
-    examples = "\n\n".join(f"Q: {g['question']}\nSQL:\n{g['sql'].strip()}" for g in project.golden)
+    examples = "\n\n".join(f"Q: {g['question']}\nSQL:\n{g['sql'].strip()}" for g in pick_examples(project.golden, question))
     return f"TABLES\n{tables}\n\nJOINS\n{joins}\n\nBUSINESS TERMS\n{terms}\n\nVERIFIED EXAMPLES\n{examples}"
 
 
@@ -55,7 +65,6 @@ def _extract_sql(text: str) -> str:
 
 def build(project, llm, run_query: Callable[[str], dict]):
     """llm: any LangChain chat model. run_query(sql) -> {columns, rows} or raises."""
-    context = describe_model(project)
     tables = evaluate.allowed_tables(project)
     entity = project.project.get("entity", "entity")
     dialect = project.project.get("warehouse", {}).get("kind", "duckdb")
@@ -68,7 +77,7 @@ def build(project, llm, run_query: Callable[[str], dict]):
             f"Write one {DIALECTS[dialect]} SELECT that answers a business user's question about {entity}s.\n"
             f"Prefer the precomputed {project.score_table} table. Use business terms exactly as defined. "
             "Never invent tables or columns. Reply with only the SQL in a ```sql block.\n\n"
-            f"{context}\n\nQUESTION: {s['question']}{retry}"
+            f"{describe_model(project, s['question'])}\n\nQUESTION: {s['question']}{retry}"
         )
         sql = _extract_sql(llm.invoke(prompt).content)
         n = s.get("attempts", 0) + 1
@@ -138,4 +147,4 @@ def default_llm():
         from langchain_anthropic import ChatAnthropic  # pip install langchain-anthropic
 
         return ChatAnthropic(model=os.environ.get("SCOREBASE_MODEL", "claude-sonnet-5-5"), max_tokens=1500, temperature=0)
-    raise RuntimeError("set OPENROUTER_API_KEY or ANTHROPIC_API_KEY")
+    raise RuntimeError("set OPENROUTER_API_KEY or ANTHROPIC_API_KEY in the engine's environment")
