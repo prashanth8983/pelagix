@@ -2,8 +2,8 @@
 // highlights as you type (a transparent textarea over the highlighted text).
 import { Link } from '@tanstack/react-router'
 import { Check, Copy, SquareArrowOutUpRight } from 'lucide-react'
-import { Fragment, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Button, cx } from './ui'
+import { Fragment, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { Button, cx } from '~/components/ui'
 
 const KEYWORDS = new Set(`
   select from where and or not in is null as on join left right inner outer full cross group by order having limit offset
@@ -98,9 +98,16 @@ export function SqlBlock({ sql, label = 'SQL', meta, openInWorkspace = true, max
 }
 
 /** Editable SQL with live highlighting and line numbers. Tab indents; ⌘/Ctrl+Enter calls onRun. */
-export function SqlEditor({ value, onChange, onRun, minRows = 8, className, ariaLabel = 'SQL' }:
-  { value: string; onChange: (v: string) => void; onRun?: () => void; minRows?: number; className?: string; ariaLabel?: string }) {
-  const area = useRef<HTMLTextAreaElement>(null)
+export function SqlEditor({ value, onChange, onRun, minRows = 8, className, ariaLabel = 'SQL', inputRef, fill }:
+  {
+    value: string; onChange: (v: string) => void; onRun?: () => void; minRows?: number; className?: string; ariaLabel?: string
+    /** The underlying textarea, for callers that read the selection or insert at the cursor. */
+    inputRef?: RefObject<HTMLTextAreaElement | null>
+    /** Grow to the parent's height instead of capping at 20 lines. */
+    fill?: boolean
+  }) {
+  const own = useRef<HTMLTextAreaElement>(null)
+  const area = inputRef ?? own
   const layer = useRef<HTMLPreElement>(null)
   const lines = Math.max(value.split('\n').length, minRows)
 
@@ -124,7 +131,7 @@ export function SqlEditor({ value, onChange, onRun, minRows = 8, className, aria
   return (
     // One vertical scroller holds the gutter and the text, so line numbers never drift.
     <div className={cx('overflow-y-auto rounded-lg border border-line bg-subtle transition-[border-color,box-shadow] focus-within:border-accent focus-within:ring-3 focus-within:ring-ring', className)}
-      style={{ maxHeight: 24 * 20 + 24 }}>
+      style={fill ? undefined : { maxHeight: 24 * 20 + 24 }}>
       <div className="flex min-h-full">
       <Gutter lines={lines} />
       <div className="relative min-w-0 flex-1">
