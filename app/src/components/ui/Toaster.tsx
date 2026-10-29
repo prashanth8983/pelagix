@@ -1,7 +1,7 @@
 // Transient confirmations ("Saved", "Run started") in the bottom-right corner.
 import { CheckCircle2, AlertCircle, X } from 'lucide-react'
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
-import { cx } from './ui'
+import { cx } from '~/components/ui'
 
 type Toast = { id: number; title: string; description?: string; tone: 'success' | 'danger' | 'neutral'; action?: { label: string; onClick: () => void } }
 type Push = (t: Omit<Toast, 'id' | 'tone'> & { tone?: Toast['tone'] }) => void
