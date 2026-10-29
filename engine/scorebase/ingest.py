@@ -1,20 +1,66 @@
 """Load each source in sources.yaml into a raw warehouse table of the same name, then
-run its checks. A failed check stops the run before anything is scored or published."""
+run its checks. A failed check stops the run before anything is scored or published.
+
+Where a source may read from is a policy, not the editor's choice: local paths must
+live under the data directory (SCOREBASE_HOME/data, plus any SCOREBASE_SOURCE_DIRS),
+and remote URLs must start with a prefix listed in SCOREBASE_REMOTE_SOURCES. Config is
+editable from the app, so without this an editor could point a source at any file on
+the engine host or make it fetch any URL.
+"""
+import os
+from pathlib import Path
+
+from . import config
 from .warehouse import is_remote
+
+GLOB_CHARS = "*?["
 
 
 class CheckFailed(SystemExit):
     pass
 
 
+class SourceNotAllowed(ValueError):
+    pass
+
+
+def allowed_dirs() -> list[Path]:
+    extra = [Path(p).expanduser().resolve() for p in os.environ.get("SCOREBASE_SOURCE_DIRS", "").split(os.pathsep) if p.strip()]
+    return [(config.ROOT / "data").resolve(), *extra]
+
+
+def allowed_remote_prefixes() -> list[str]:
+    return [p.strip() for p in os.environ.get("SCOREBASE_REMOTE_SOURCES", "").split(",") if p.strip()]
+
+
+def _fixed_prefix(path: Path) -> Path:
+    """The part of a glob before its first wildcard component."""
+    parts = []
+    for part in path.parts:
+        if any(c in part for c in GLOB_CHARS):
+            break
+        parts.append(part)
+    return Path(*parts) if parts else Path(".")
+
+
 def location(project, src: dict) -> str:
+    """Where a source reads from, after the policy above. Raises SourceNotAllowed."""
     if src.get("connector") == "postgres":
         return ""
     raw = src["path"]
-    if is_remote(raw):
+    if is_remote(raw) and "://" in raw:
+        prefixes = allowed_remote_prefixes()
+        if not any(raw.startswith(p) for p in prefixes):
+            raise SourceNotAllowed(
+                f"source '{src['name']}': remote URLs must start with one of SCOREBASE_REMOTE_SOURCES "
+                f"({', '.join(prefixes) or 'none set'})")
         return raw
     path = project.path(raw)
-    if not path.exists():
+    fixed = _fixed_prefix(path).resolve()
+    if not any(fixed == d or d in fixed.parents for d in allowed_dirs()):
+        roots = ", ".join(str(d) for d in allowed_dirs())
+        raise SourceNotAllowed(f"source '{src['name']}': local paths must be under {roots}")
+    if not is_remote(raw) and not path.exists():
         raise SystemExit(f"source '{src['name']}' missing file {path} (run `generate` first?)")
     return str(path)
 
