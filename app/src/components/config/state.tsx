@@ -7,7 +7,7 @@ import { useServerFn } from '@tanstack/react-start'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Config, Run, Section } from '~/lib/types'
 import { getConfig, listRuns, saveSection, startRun, validateSection } from '~/server/config'
-import { useDebounced } from '../ui'
+import { useDebounced } from '~/components/ui'
 
 type ConfigState = { config: Config | null; error: string | null; reload: () => Promise<void> }
 const ConfigCtx = createContext<ConfigState>({ config: null, error: null, reload: async () => {} })
