@@ -4,14 +4,21 @@ Scores come from scores.yaml. A score whose SQL mentions another score's name is
 computed after it, so formulas can build on each other in any order. Scores with no
 dependencies are aggregates over `from`, grouped by `key_expr`; each later layer is a
 SELECT over the previous one.
+
+When project.yaml names an `entity_table`, every entity in it gets a row, including
+those with no rows in `from`: their scores are the score's `default`, or NULL.
 """
 import re
 
+_STRINGS = re.compile(r"'(?:[^']|'')*'")
+
 
 def _deps(score: dict, names: set[str]) -> set[str]:
+    # Ignore string literals and qualified columns: 'status' and oi.status aren't scores.
+    sql = _STRINGS.sub("''", score["sql"])
     return {
         n for n in names
-        if n != score["name"] and re.search(rf"\b{re.escape(n)}\b", score["sql"])
+        if n != score["name"] and re.search(rf"(?<![.\w]){re.escape(n)}\b", sql)
     }
 
 
@@ -32,10 +39,19 @@ def layers(scores: list[dict]) -> list[list[dict]]:
     return out
 
 
-def build_sql(project) -> str:
+def plan(project) -> list[dict]:
+    """Each score with its layer and dependencies, for the app's dependency view."""
+    scores = project.scores["scores"]
+    names = {s["name"] for s in scores}
+    return [
+        {"name": s["name"], "layer": i, "depends_on": sorted(_deps(s, names))}
+        for i, layer in enumerate(layers(scores)) for s in layer
+    ]
+
+
+def build_select(project) -> str:
     cfg = project.scores
     key = project.key
-    table = project.score_table
     ls = layers(cfg["scores"])
 
     base = ls[0]
@@ -51,13 +67,28 @@ def build_sql(project) -> str:
         cols = ",\n    ".join(f"{s['sql']} AS {s['name']}" for s in layer)
         ctes.append(f"l{i} AS (\n  SELECT *,\n    {cols}\n  FROM l{i - 1}\n)")
 
-    last = len(ls) - 1
-    order = [key] + [s["name"] for layer in ls for s in layer]
+    last = f"l{len(ls) - 1}"
+    ordered = [s for layer in ls for s in layer]
+    et, ek = project.project.get("entity_table"), project.project.get("entity_key")
+    if not et:
+        cols = ", ".join([key] + [s["name"] for s in ordered])
+        return f"WITH " + ",\n".join(ctes) + f"\nSELECT {cols}, CURRENT_TIMESTAMP AS scored_at\nFROM {last}"
+
+    def col(s):
+        if s.get("default") is None:
+            return f"s.{s['name']}"
+        return f"COALESCE(s.{s['name']}, {s['default']}) AS {s['name']}"
+
+    cols = ",\n  ".join([f"e.{ek} AS {key}"] + [col(s) for s in ordered])
     return (
-        f"CREATE OR REPLACE TABLE {table} AS\nWITH "
-        + ",\n".join(ctes)
-        + f"\nSELECT {', '.join(order)}, CURRENT_TIMESTAMP AS scored_at\nFROM l{last}"
+        "WITH " + ",\n".join(ctes)
+        + f"\nSELECT\n  {cols},\n  CURRENT_TIMESTAMP AS scored_at\n"
+        + f"FROM {et} e\nLEFT JOIN {last} s ON s.{key} = e.{ek}"
     )
+
+
+def build_sql(project) -> str:
+    return f"CREATE OR REPLACE TABLE {project.score_table} AS\n" + build_select(project)
 
 
 def run(project, wh) -> int:

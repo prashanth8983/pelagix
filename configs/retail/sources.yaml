@@ -1,18 +1,23 @@
 # Where raw data comes from. Each source lands as one raw table in the warehouse.
 # `scorebase generate retail` writes synthetic TheLook-shaped files to data/retail/.
-# To use the real TheLook export, point `path` at the exported Parquet files.
+# To use the real TheLook export, point `path` at the exported Parquet files (globs and
+# s3:// or https:// URLs work too), or use `connector: postgres` with `dsn_env` and `table`.
 - name: users
   connector: csv
   path: data/retail/users.csv
+  checks: {columns: [id, traffic_source], not_null: [id], unique: [id], min_rows: 1}
 - name: products
   connector: csv
   path: data/retail/products.csv
+  checks: {not_null: [id], unique: [id]}
 - name: orders
   connector: csv
   path: data/retail/orders.csv
+  checks: {not_null: [order_id, user_id, created_at], unique: [order_id]}
 - name: order_items
   connector: csv
   path: data/retail/order_items.csv
+  checks: {not_null: [order_id, user_id, sale_price]}
 - name: events
   connector: csv
   path: data/retail/events.csv

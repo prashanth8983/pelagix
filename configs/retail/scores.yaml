@@ -1,5 +1,6 @@
 # Per-customer scores. Each `sql` is an expression over `from`, grouped by the entity key.
 # A score may use other scores by name; the scorer orders them by dependency.
+# `default` fills customers with no qualifying rows (never ordered); otherwise they get NULL.
 from: |
   order_items oi
   JOIN orders o ON o.order_id = oi.order_id
@@ -9,31 +10,54 @@ key_expr: oi.user_id
 scores:
   - name: total_spend
     sql: "ROUND(SUM(oi.sale_price), 2)"
+    label: Spent
     description: Total spent on completed items, in USD
+    format: money
+    default: 0
   - name: order_count
     sql: "COUNT(DISTINCT o.order_id)"
+    label: Orders
     description: Number of distinct orders
+    format: count
+    default: 0
   - name: first_order_at
     sql: "MIN(o.created_at)"
+    label: First order
+    format: date
   - name: last_order_at
     sql: "MAX(o.created_at)"
+    label: Last order
+    format: date
   - name: days_since_last_order
     sql: "CURRENT_DATE - CAST(last_order_at AS DATE)"
+    label: Days since order
     description: Days since the most recent order
+    format: days
   - name: avg_order_value
     sql: "ROUND(total_spend / NULLIF(order_count, 0), 2)"
+    label: Avg order
+    format: money
   - name: tenure_days
     sql: "GREATEST(CURRENT_DATE - CAST(first_order_at AS DATE), 1)"
+    label: Tenure
+    format: days
   - name: ltv
     # spend so far + one year at the customer's own order rate, measured over at least
     # 90 days so a brand-new customer's first order isn't extrapolated to hundreds a year
     sql: "ROUND(total_spend + avg_order_value * (order_count * 365.0 / GREATEST(tenure_days, 90)), 2)"
+    label: LTV
     description: Lifetime value estimate in USD
+    format: money
+    default: 0
   - name: churn_risk
     # 0 = just ordered, 1 = gone; scaled by the customer's own gap between orders
     sql: "ROUND(LEAST(days_since_last_order / GREATEST(tenure_days / NULLIF(order_count, 0) * 2.0, 60), 1), 3)"
+    label: Churn risk
     description: Risk of leaving, 0 to 1
+    format: ratio
   - name: ltv_decile
     sql: "NTILE(10) OVER (ORDER BY ltv)"
     window: true
-    description: LTV decile, 10 = top
+    label: LTV decile
+    description: LTV decile among buyers, 10 = top
+    format: count

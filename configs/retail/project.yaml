@@ -2,7 +2,7 @@
 name: retail
 entity: customer          # what each score row describes
 key: user_id              # column that identifies the entity
-entity_table: users       # table holding one row per entity
+entity_table: users       # every row here gets scores, even customers who never ordered
 entity_key: id            # that table's key column
 
 warehouse:
@@ -12,3 +12,10 @@ warehouse:
 publish:
   postgres_url_env: SCOREBASE_PG_URL   # read from the environment, never stored here
   table: entity_scores
+
+display:                  # how the app lists customers
+  entity_label: Customers
+  columns: [ltv, total_spend, order_count, last_order_at]
+  highlight: churn_risk
+  default_sort: ltv
+  sort_dir: desc

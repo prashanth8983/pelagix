@@ -4,14 +4,14 @@ tables:
   entity_scores:
     description: One row per customer with precomputed scores
     columns:
-      user_id: Customer id
+      user_id: Customer id (every customer has a row, including those who never bought)
       total_spend: Total spent on completed items, USD
       order_count: Number of orders
       days_since_last_order: Days since the last order
       avg_order_value: Average order value, USD
       ltv: Lifetime value estimate, USD
       churn_risk: Risk of leaving, 0 to 1
-      ltv_decile: LTV decile, 10 = top
+      ltv_decile: LTV decile among buyers, 10 = top (NULL for customers who never bought)
   users:
     description: Customer profile
     columns:

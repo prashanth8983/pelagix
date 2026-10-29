@@ -5,10 +5,12 @@
   rules: []
 - name: vip
   label: VIPs
+  description: Top two LTV deciles among buyers
   rules:
     - {column: ltv_decile, op: ">=", value: 9}
 - name: at_risk
   label: At risk
+  description: Churn risk above 70%
   rules:
     - {column: churn_risk, op: ">", value: 0.7}
 - name: vip_lapsing
@@ -20,3 +22,8 @@
   label: One-time buyers
   rules:
     - {column: order_count, op: "=", value: 1}
+- name: never_bought
+  label: Never bought
+  description: Signed up but no completed order
+  rules:
+    - {column: order_count, op: "=", value: 0}

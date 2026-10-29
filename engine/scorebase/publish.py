@@ -4,21 +4,30 @@ Postgres is the app database the UI syncs from (via Zero). The score table is ke
 stable and only rows whose values changed are written, so the sync layer streams a
 small diff instead of the whole table after every scoring run. All of it happens in
 one transaction, so readers never see a half-applied run.
+
+Column types come from the warehouse schema. A score added to the config becomes a new
+column, a score whose type changed is converted, and a removed score's column is dropped.
 """
 import os
-from datetime import date, datetime
-from decimal import Decimal
+import re
 
-PG_TYPES = [(bool, "boolean"), (int, "bigint"), (float, "double precision"),
-            (Decimal, "numeric"), (datetime, "timestamptz"), (date, "date"), (str, "text")]
+# Warehouse type (DuckDB or Snowflake name, upper-cased) -> Postgres type. First match wins.
+PG_TYPES = [
+    (r"^BOOL", "boolean"),
+    (r"^(TINYINT|SMALLINT|INTEGER|INT|BIGINT|UTINYINT|USMALLINT|UINTEGER)\b", "bigint"),
+    (r"^NUMBER\(\d+,\s*0\)$", "bigint"),
+    (r"^(HUGEINT|UBIGINT|UHUGEINT|DECIMAL|NUMERIC|NUMBER)", "numeric"),
+    (r"^(DOUBLE|FLOAT|REAL)", "double precision"),
+    (r"^DATE$", "date"),
+    (r"^TIMESTAMP", "timestamptz"),
+    (r"^TIME", "time"),
+    (r"^(JSON|STRUCT|MAP|VARIANT|OBJECT|ARRAY)|\[\]$", "jsonb"),
+]
 
 
-def _pg_type(values) -> str:
-    sample = next((v for v in values if v is not None), None)
-    for py, pg in PG_TYPES:
-        if isinstance(sample, py):
-            return pg
-    return "text"
+def pg_type(warehouse_type: str) -> str:
+    t = warehouse_type.upper().strip()
+    return next((pg for pat, pg in PG_TYPES if re.search(pat, t)), "text")
 
 
 def _q(name: str) -> str:
@@ -35,27 +44,41 @@ def run(project, wh, segments: list[dict]) -> dict:
         raise SystemExit(f"set {env} to a Postgres URL (see docker-compose.yml)")
 
     table, key = project.score_table, project.key
-    cols, rows = wh.query(f"SELECT * FROM {table}")
-    types = [_pg_type(r[i] for r in rows[:500]) for i in range(len(cols))]
+    schema = wh.describe(table)
+    cols = [c for c, _ in schema]
+    types = {c: pg_type(t) for c, t in schema}
     value_cols = [c for c in cols if c not in (key, "scored_at")]
     T, K = _q(table), _q(key)
 
     with psycopg.connect(url) as con, con.cursor() as cur:
-        col_defs = ", ".join(f"{_q(c)} {t}" for c, t in zip(cols, types))
+        col_defs = ", ".join(f"{_q(c)} {types[c]}" for c in cols)
         cur.execute(f"CREATE TABLE IF NOT EXISTS {T} ({col_defs}, PRIMARY KEY ({K}))")
-        for c, t in zip(cols, types):  # new scores added to the config become new columns
-            cur.execute(f"ALTER TABLE {T} ADD COLUMN IF NOT EXISTS {_q(c)} {t}")
+        cur.execute(
+            "SELECT column_name, data_type FROM information_schema.columns "
+            "WHERE table_schema = current_schema() AND table_name = %s", (table,))
+        existing = dict(cur.fetchall())
+        for c in cols:
+            if c not in existing:  # new scores added to the config become new columns
+                cur.execute(f"ALTER TABLE {T} ADD COLUMN {_q(c)} {types[c]}")
+            elif existing[c] != types[c] and c != key:
+                cur.execute(f"ALTER TABLE {T} ALTER COLUMN {_q(c)} TYPE {types[c]} USING {_q(c)}::{types[c]}")
+        dropped = [c for c in existing if c not in cols]
+        for c in dropped:
+            cur.execute(f"ALTER TABLE {T} DROP COLUMN {_q(c)}")
 
         cur.execute(f"CREATE TEMP TABLE incoming (LIKE {T} INCLUDING DEFAULTS) ON COMMIT DROP")
+        _, rows = wh.stream(f"SELECT {', '.join(cols)} FROM {table}")
+        n = 0
         with cur.copy(f"COPY incoming ({', '.join(map(_q, cols))}) FROM STDIN") as cp:
             for r in rows:
                 cp.write_row(r)
+                n += 1
 
-        changed = " OR ".join(f"t.{_q(c)} IS DISTINCT FROM i.{_q(c)}" for c in value_cols)
+        changed = " OR ".join(f"t.{_q(c)} IS DISTINCT FROM i.{_q(c)}" for c in value_cols) or "FALSE"
         sets = ", ".join(f"{_q(c)} = EXCLUDED.{_q(c)}" for c in cols if c != key)
         cur.execute(
             f"""INSERT INTO {T} ({', '.join(map(_q, cols))})
-                SELECT i.* FROM incoming i
+                SELECT {', '.join('i.' + _q(c) for c in cols)} FROM incoming i
                 LEFT JOIN {T} t ON t.{K} = i.{K}
                 WHERE t.{K} IS NULL OR {changed}
                 ON CONFLICT ({K}) DO UPDATE SET {sets}"""
@@ -68,15 +91,20 @@ def run(project, wh, segments: list[dict]) -> dict:
             name text PRIMARY KEY, label text, filter text, size bigint, updated_at timestamptz)""")
         cur.execute("ALTER TABLE segments ADD COLUMN IF NOT EXISTS rules jsonb")
         cur.execute("ALTER TABLE segments ADD COLUMN IF NOT EXISTS position int")
+        cur.execute("ALTER TABLE segments ADD COLUMN IF NOT EXISTS description text")
         for i, s in enumerate(segments):
             cur.execute(
-                """INSERT INTO segments (name, label, filter, rules, position, size, updated_at)
-                   VALUES (%s, %s, %s, %s, %s, %s, now())
-                   ON CONFLICT (name) DO UPDATE SET label = EXCLUDED.label, filter = EXCLUDED.filter,
-                     rules = EXCLUDED.rules, position = EXCLUDED.position,
+                """INSERT INTO segments (name, label, description, filter, rules, position, size, updated_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, now())
+                   ON CONFLICT (name) DO UPDATE SET label = EXCLUDED.label, description = EXCLUDED.description,
+                     filter = EXCLUDED.filter, rules = EXCLUDED.rules, position = EXCLUDED.position,
                      size = EXCLUDED.size, updated_at = now()""",
-                (s["name"], s.get("label", s["name"]), s["where"], Jsonb(s.get("rules", [])), i, s["size"]),
+                (s["name"], s.get("label") or s["name"], s.get("description"), s["where"],
+                 Jsonb(s.get("rules", [])), i, s["size"]),
             )
         cur.execute("DELETE FROM segments WHERE NOT (name = ANY(%s))", ([s["name"] for s in segments],))
         con.commit()
-    return {"rows": len(rows), "written": upserted, "deleted": deleted}
+    out = {"rows": n, "written": upserted, "deleted": deleted}
+    if dropped:
+        out["dropped_columns"] = dropped
+    return out
