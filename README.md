@@ -26,6 +26,7 @@ Everything domain-specific lives in YAML under `configs/<project>/`. The engine 
 - [Repository layout](#repository-layout)
 - [Security model](#security-model)
 - [Known limitations](#known-limitations)
+- [AI-assisted development](#ai-assisted-development)
 - [Contributing and license](#contributing-and-license)
 
 ## Features
@@ -461,6 +462,14 @@ See [SECURITY.md](SECURITY.md) for reporting.
 - Scores are SQL expressions. There is no built-in model training; a model's output can be loaded as a source and scored from there.
 - The agent's quality depends on the model, `model.yaml` and the verified examples. Measure it with `scorebase eval --agent` before relying on it.
 - Zero replicates the `public` schema. Keep other application tables out of that schema or configure zero-cache's publications.
+
+## AI-assisted development
+
+Most of the code in this repository was written with AI coding tools, mainly Claude Code, under my direction. I set the scope, the architecture and the product decisions; the AI wrote the implementation, one module at a time, against those specs. Every change was reviewed, tested and committed by me, and I'm responsible for what ships.
+
+The work is split this way on purpose. I start top-down: what the product does, how the engine, API and app fit together, and what each piece must guarantee (the SQL guard, roles, the config schema). The AI then builds bottom-up, filling in well-specified units such as a validator, an editor page or a chart widget, and running the tests until they pass. That's where it's strongest. Choosing what to build and judging whether it's right stays with a person.
+
+Policy for contributors: AI-generated code is welcome and treated like any other contribution. You need to understand it, test it, and be able to explain it in review. Don't paste secrets, credentials or private data into AI tools.
 
 ## Contributing and license
 
