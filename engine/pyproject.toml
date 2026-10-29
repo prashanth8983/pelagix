@@ -1,0 +1,17 @@
+[project]
+name = "scorebase"
+version = "0.1.0"
+description = "Config-driven customer scoring engine: warehouse -> scores -> Postgres"
+requires-python = ">=3.11"
+dependencies = ["duckdb>=1.1", "pyyaml>=6", "psycopg[binary]>=3.2", "sqlglot>=25", "pytz"]
+
+[project.optional-dependencies]
+snowflake = ["snowflake-connector-python>=3.12"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+scorebase = "scorebase.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

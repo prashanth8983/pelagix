@@ -1,0 +1,57 @@
+# Semantic model: what the agent and UI are allowed to know about the data.
+# On Snowflake this becomes a semantic view; locally it is injected into the agent prompt.
+tables:
+  entity_scores:
+    description: One row per customer with precomputed scores
+    columns:
+      user_id: Customer id
+      total_spend: Total spent on completed items, USD
+      order_count: Number of orders
+      days_since_last_order: Days since the last order
+      avg_order_value: Average order value, USD
+      ltv: Lifetime value estimate, USD
+      churn_risk: Risk of leaving, 0 to 1
+      ltv_decile: LTV decile, 10 = top
+  users:
+    description: Customer profile
+    columns:
+      id: Customer id
+      age: Age in years
+      gender: M or F
+      state: US state
+      traffic_source: Acquisition channel (Search, Organic, Facebook, Email, Display)
+  orders:
+    description: One row per order
+    columns:
+      order_id: Order id
+      user_id: Customer id
+      status: Complete, Shipped, Processing, Cancelled, Returned
+      created_at: Order time
+  order_items:
+    description: One row per item in an order
+    columns:
+      order_id: Order id
+      user_id: Customer id
+      product_id: Product id
+      sale_price: Price paid, USD
+      status: Item status
+  products:
+    description: Product catalog
+    columns:
+      id: Product id
+      category: Product category
+      department: Men or Women
+      brand: Brand name
+      retail_price: List price, USD
+
+joins:
+  - entity_scores.user_id = users.id
+  - orders.user_id = users.id
+  - order_items.order_id = orders.order_id
+  - order_items.product_id = products.id
+
+synonyms:
+  VIP: ltv_decile >= 9
+  at risk: churn_risk > 0.7
+  lapsed: days_since_last_order > 60
+  high value: ltv_decile >= 9

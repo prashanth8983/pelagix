@@ -1,0 +1,13 @@
+# Saved segments: filters over the published score table. Re-counted on every run.
+- name: vip
+  label: VIPs
+  where: "ltv_decile >= 9"
+- name: at_risk
+  label: At risk
+  where: "churn_risk > 0.7"
+- name: vip_lapsing
+  label: VIPs who stopped buying
+  where: "ltv_decile >= 9 AND days_since_last_order > 60"
+- name: one_and_done
+  label: One-time buyers
+  where: "order_count = 1"

@@ -1,0 +1,33 @@
+# Verified question -> SQL pairs. Shown to the agent as examples and used by `scorebase eval`.
+# All queries run against the published score table plus the raw tables.
+- question: Who are my VIP customers?
+  sql: |
+    SELECT user_id, ltv, total_spend
+    FROM entity_scores
+    WHERE ltv_decile >= 9
+    ORDER BY ltv DESC
+    LIMIT 50
+- question: How many customers are at risk of leaving?
+  sql: |
+    SELECT COUNT(*) AS at_risk_customers
+    FROM entity_scores
+    WHERE churn_risk > 0.7
+- question: Show high-value customers who haven't ordered in 60 days
+  sql: |
+    SELECT user_id, ltv, days_since_last_order, churn_risk
+    FROM entity_scores
+    WHERE ltv_decile >= 9 AND days_since_last_order > 60
+    ORDER BY churn_risk DESC
+- question: Which traffic source brings customers with the highest lifetime value?
+  sql: |
+    SELECT u.traffic_source, ROUND(AVG(s.ltv), 2) AS avg_ltv, COUNT(*) AS customers
+    FROM entity_scores s
+    JOIN users u ON u.id = s.user_id
+    GROUP BY u.traffic_source
+    ORDER BY avg_ltv DESC
+- question: What is the churn risk distribution?
+  sql: |
+    SELECT FLOOR(churn_risk * 10) / 10 AS risk_bucket, COUNT(*) AS customers
+    FROM entity_scores
+    GROUP BY 1
+    ORDER BY 1

@@ -1,0 +1,14 @@
+# Retail domain: one brand's customers, orders and web events (TheLook-shaped).
+name: retail
+entity: customer          # what each score row describes
+key: user_id              # column that identifies the entity
+entity_table: users       # table holding one row per entity
+entity_key: id            # that table's key column
+
+warehouse:
+  kind: duckdb            # duckdb (local) | snowflake
+  path: data/retail.duckdb
+
+publish:
+  postgres_url_env: SCOREBASE_PG_URL   # read from the environment, never stored here
+  table: entity_scores

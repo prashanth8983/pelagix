@@ -1,0 +1,18 @@
+# Where raw data comes from. Each source lands as one raw table in the warehouse.
+# `scorebase generate retail` writes synthetic TheLook-shaped files to data/retail/.
+# To use the real TheLook export, point `path` at the exported Parquet files.
+- name: users
+  connector: csv
+  path: data/retail/users.csv
+- name: products
+  connector: csv
+  path: data/retail/products.csv
+- name: orders
+  connector: csv
+  path: data/retail/orders.csv
+- name: order_items
+  connector: csv
+  path: data/retail/order_items.csv
+- name: events
+  connector: csv
+  path: data/retail/events.csv

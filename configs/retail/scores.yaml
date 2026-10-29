@@ -1,0 +1,39 @@
+# Per-customer scores. Each `sql` is an expression over `from`, grouped by the entity key.
+# A score may use other scores by name; the scorer orders them by dependency.
+from: |
+  order_items oi
+  JOIN orders o ON o.order_id = oi.order_id
+where: "oi.status NOT IN ('Cancelled', 'Returned')"
+key_expr: oi.user_id
+
+scores:
+  - name: total_spend
+    sql: "ROUND(SUM(oi.sale_price), 2)"
+    description: Total spent on completed items, in USD
+  - name: order_count
+    sql: "COUNT(DISTINCT o.order_id)"
+    description: Number of distinct orders
+  - name: first_order_at
+    sql: "MIN(o.created_at)"
+  - name: last_order_at
+    sql: "MAX(o.created_at)"
+  - name: days_since_last_order
+    sql: "CURRENT_DATE - CAST(last_order_at AS DATE)"
+    description: Days since the most recent order
+  - name: avg_order_value
+    sql: "ROUND(total_spend / NULLIF(order_count, 0), 2)"
+  - name: tenure_days
+    sql: "GREATEST(CURRENT_DATE - CAST(first_order_at AS DATE), 1)"
+  - name: ltv
+    # spend so far + one year at the customer's own order rate, measured over at least
+    # 90 days so a brand-new customer's first order isn't extrapolated to hundreds a year
+    sql: "ROUND(total_spend + avg_order_value * (order_count * 365.0 / GREATEST(tenure_days, 90)), 2)"
+    description: Lifetime value estimate in USD
+  - name: churn_risk
+    # 0 = just ordered, 1 = gone; scaled by the customer's own gap between orders
+    sql: "ROUND(LEAST(days_since_last_order / GREATEST(tenure_days / NULLIF(order_count, 0) * 2.0, 60), 1), 3)"
+    description: Risk of leaving, 0 to 1
+  - name: ltv_decile
+    sql: "NTILE(10) OVER (ORDER BY ltv)"
+    window: true
+    description: LTV decile, 10 = top

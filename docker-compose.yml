@@ -1,0 +1,20 @@
+# Local app database. wal_level=logical is what Zero needs to replicate Postgres to the browser.
+services:
+  postgres:
+    image: postgres:16-alpine
+    command: ["postgres", "-c", "wal_level=logical"]
+    environment:
+      POSTGRES_USER: scorebase
+      POSTGRES_PASSWORD: scorebase
+      POSTGRES_DB: scorebase
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scorebase"]
+      interval: 2s
+      retries: 30
+
+volumes:
+  pgdata:
