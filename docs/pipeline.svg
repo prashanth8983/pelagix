@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 330" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#4a5a73"/></marker>
+    <style>
+      .step { fill: #ffffff; stroke: #0E5DB0; stroke-width: 1.3; rx: 8; }
+      .n { fill: #0A2350; font-weight: 700; font-size: 12px; }
+      .t { fill: #0b1a33; font-weight: 600; font-size: 14px; }
+      .d { fill: #4a5a73; font-size: 12px; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; fill: #0A2350; }
+      .line { stroke: #4a5a73; stroke-width: 1.3; fill: none; marker-end: url(#a); }
+      .stop { fill: #fdf1f1; stroke: #c62828; stroke-width: 1.2; rx: 6; }
+      .stoptext { fill: #c62828; font-size: 11.5px; }
+      .in { fill: #f1f4f9; stroke: #8e9bb0; rx: 8; }
+    </style>
+  </defs>
+
+  <!-- inputs -->
+  <rect class="in" x="20" y="24" width="150" height="60"/>
+  <text class="t" x="34" y="48">Sources</text>
+  <text class="d" x="34" y="68">files or Postgres tables</text>
+  <rect class="in" x="20" y="104" width="150" height="60"/>
+  <text class="t" x="34" y="128">scores.yaml</text>
+  <text class="d" x="34" y="148">SQL per score</text>
+  <rect class="in" x="20" y="184" width="150" height="60"/>
+  <text class="t" x="34" y="208">segments.yaml</text>
+  <text class="d" x="34" y="228">rules</text>
+
+  <!-- steps -->
+  <g>
+    <rect class="step" x="210" y="24" width="130" height="70"/>
+    <text class="n" x="224" y="44">1</text>
+    <text class="t" x="240" y="44">load</text>
+    <text class="d" x="224" y="64">each source lands</text>
+    <text class="d" x="224" y="80">as one raw table</text>
+  </g>
+  <g>
+    <rect class="step" x="370" y="24" width="130" height="70"/>
+    <text class="n" x="384" y="44">2</text>
+    <text class="t" x="400" y="44">check</text>
+    <text class="d" x="384" y="64">columns, nulls,</text>
+    <text class="d" x="384" y="80">uniques, min rows</text>
+  </g>
+  <g>
+    <rect class="step" x="530" y="24" width="130" height="70"/>
+    <text class="n" x="544" y="44">3</text>
+    <text class="t" x="560" y="44">score</text>
+    <text class="d" x="544" y="64">one row per entity,</text>
+    <text class="d" x="544" y="80">scores in order</text>
+  </g>
+  <g>
+    <rect class="step" x="690" y="24" width="130" height="70"/>
+    <text class="n" x="704" y="44">4</text>
+    <text class="t" x="720" y="44">segments</text>
+    <text class="d" x="704" y="64">rules become SQL,</text>
+    <text class="d" x="704" y="80">sizes are counted</text>
+  </g>
+  <g>
+    <rect class="step" x="850" y="24" width="110" height="70"/>
+    <text class="n" x="864" y="44">5</text>
+    <text class="t" x="880" y="44">publish</text>
+    <text class="d" x="864" y="64">changed rows</text>
+    <text class="d" x="864" y="80">to Postgres</text>
+  </g>
+
+  <path class="line" d="M340,59 L370,59"/>
+  <path class="line" d="M500,59 L530,59"/>
+  <path class="line" d="M660,59 L690,59"/>
+  <path class="line" d="M820,59 L850,59"/>
+  <path class="line" d="M170,54 L210,54"/>
+  <path class="line" d="M170,134 L330,134 L330,184 L595,184 L595,94"/>
+  <path class="line" d="M170,214 L755,214 L755,94"/>
+
+  <!-- failure -->
+  <rect class="stop" x="370" y="118" width="130" height="40"/>
+  <text class="stoptext" x="384" y="136">a failed check stops</text>
+  <text class="stoptext" x="384" y="150">the run here</text>
+  <path class="line" d="M435,94 L435,118"/>
+
+  <!-- outputs -->
+  <text class="d" x="210" y="256">In the warehouse after a run:</text>
+  <text class="mono" x="210" y="274">raw tables (one per source) · entity_scores · entity_scores_history (optional)</text>
+  <text class="d" x="210" y="296">In Postgres, for the app:</text>
+  <text class="mono" x="210" y="314">public.entity_scores (changed rows only) · public.segments (rules and sizes)</text>
+</svg>
