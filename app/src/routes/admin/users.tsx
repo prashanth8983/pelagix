@@ -58,7 +58,7 @@ function Users() {
       {errors.length > 0 && <ErrorList errors={errors} />}
       {secret && (
         <div className="rounded-lg border border-warning/25 bg-warning-subtle px-4 py-3 text-[13px] text-fg">
-          <p>Temporary password for <span className="font-medium">{secret.email}</span>. It’s shown once: send it to them privately. They choose their own at first sign-in.</p>
+          <p>Temporary password for <span className="font-medium">{secret.email}</span>. Shown once. They’ll set their own at first sign-in.</p>
           <div className="mt-2 flex items-center gap-2">
             <code className="rounded bg-surface px-2 py-1 font-mono text-[13px]">{secret.password}</code>
             <Button size="sm" onClick={() => navigator.clipboard?.writeText(secret.password)}>Copy</Button>
@@ -92,7 +92,7 @@ function Users() {
         </form>
       </Card>
 
-      <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+      <div className="overflow-x-auto rounded-lg border border-line bg-surface shadow-card">
         <table className="w-full text-[13px]">
           <thead className="text-left text-[12px] text-muted">
             <tr>
@@ -175,7 +175,7 @@ function Audit() {
   if (!rows) return <p className="text-sm text-muted">Loading…</p>
   const tone = (a: string) => (a.includes('failed') ? 'danger' : a.startsWith('user.') ? 'warning' : a.startsWith('config') || a.startsWith('run') ? 'accent' : 'neutral')
   return (
-    <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+    <div className="overflow-x-auto rounded-lg border border-line bg-surface shadow-card">
       <table className="w-full text-[13px]">
         <thead className="text-left text-[12px] text-muted">
           <tr><th className="px-5 py-2.5 font-medium">When</th><th className="px-3 py-2.5 font-medium">Who</th><th className="px-3 py-2.5 font-medium">Action</th><th className="px-3 py-2.5 font-medium">Detail</th><th className="px-5 py-2.5 font-medium">IP</th></tr>
