@@ -12,12 +12,12 @@ import {
   YAxis, ZAxis,
 } from 'recharts'
 import type { Cell } from '~/lib/types'
-import { cell, short } from './format'
-import { Button, DataTable, Input, Select, Tabs, cx, useDismiss, type SortState } from './ui'
+import { cell, short } from '~/components/ui/format'
+import { Button, DataTable, Input, Select, Tabs, cx, useDismiss, type SortState } from '~/components/ui'
 
 // Categorical slot 1, validated for both themes (see styles.css). Every chart here is
 // single-series, so one hue carries every mark.
-export const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)']
+export const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-6)']
 export const axisTick = { fontSize: 11, fill: 'var(--faint)' }
 export const tooltipStyle = {
   contentStyle: {
