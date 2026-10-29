@@ -3,7 +3,7 @@ name = "scorebase"
 version = "0.1.0"
 description = "Config-driven customer scoring engine: warehouse -> scores -> Postgres"
 requires-python = ">=3.11"
-dependencies = ["duckdb>=1.1", "pyyaml>=6", "psycopg[binary]>=3.2", "sqlglot>=25", "pytz"]
+dependencies = ["duckdb>=1.1", "pyyaml>=6", "psycopg[binary]>=3.2", "sqlglot>=25", "pydantic>=2.7", "pytz"]
 
 [project.optional-dependencies]
 snowflake = ["snowflake-connector-python>=3.12"]
