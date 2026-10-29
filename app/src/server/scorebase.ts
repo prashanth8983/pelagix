@@ -26,6 +26,8 @@ export type Context = {
     synonyms?: Record<string, string>
   }
   golden: Golden[]
+  attributes: string[]
+  agent: boolean
 }
 
 export class ApiError extends Error {
@@ -60,17 +62,3 @@ export const askGraph = (question: string) =>
   )
 export const matchGolden = (question: string) =>
   call<(Golden & { score: number; verified: boolean; unmatched: string[] }) | Record<string, never>>('/match', { question })
-
-// The semantic layer as prompt text: tables, columns, joins, business terms, examples.
-export function describeModel(ctx: Context): string {
-  const tables = Object.entries(ctx.model.tables)
-    .map(([name, t]) => {
-      const cols = Object.entries(t.columns).map(([c, d]) => `    ${c}: ${d}`).join('\n')
-      return `  ${name} -- ${t.description ?? ''}\n${cols}`
-    })
-    .join('\n')
-  const joins = (ctx.model.joins ?? []).map((j) => `  ${j}`).join('\n')
-  const terms = Object.entries(ctx.model.synonyms ?? {}).map(([k, v]) => `  "${k}" means ${v}`).join('\n')
-  const examples = ctx.golden.map((g) => `Q: ${g.question}\nSQL:\n${g.sql.trim()}`).join('\n\n')
-  return `TABLES\n${tables}\n\nJOINS\n${joins}\n\nBUSINESS TERMS\n${terms}\n\nVERIFIED EXAMPLES\n${examples}`
-}
