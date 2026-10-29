@@ -1,13 +1,13 @@
 // ⌘K: jump to any page, run the pipeline, switch theme, or send a question to the Ask box.
 import { useNavigate } from '@tanstack/react-router'
-import { CornerDownLeft, Search } from 'lucide-react'
+import { CornerDownLeft, Search, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTheme } from '~/lib/theme'
 import { useMe } from '~/lib/session'
-import { useRuns } from './config/state'
-import { NAV } from './nav'
-import { useToast } from './Toaster'
-import { Kbd, cx } from './ui'
+import { useRuns } from '~/components/config/state'
+import { NAV } from '~/components/layout/nav'
+import { useToast } from '~/components/ui/Toaster'
+import { Kbd, cx } from '~/components/ui'
 
 type Command = { id: string; label: string; group: string; icon?: ReactNode; hint?: string; run: () => void }
 
@@ -66,7 +66,7 @@ export function CommandPalette() {
   const term = q.trim().toLowerCase()
   const shown = term ? commands.filter((c) => c.label.toLowerCase().includes(term)) : commands
   const ask: Command | null = term.length > 2
-    ? { id: 'ask', label: `Ask “${q.trim()}”`, group: 'Ask', hint: 'Overview', run: () => navigate({ to: '/', search: { q: q.trim() } }) }
+    ? { id: 'ask', label: `Ask “${q.trim()}”`, group: 'Ask', icon: <Sparkles className="size-4 text-accent" />, hint: 'Overview', run: () => navigate({ to: '/', search: { q: q.trim() } }) }
     : null
   const list = ask ? [...shown, ask] : shown
 
