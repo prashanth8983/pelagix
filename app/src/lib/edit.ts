@@ -51,3 +51,15 @@ export const uniqueName = (taken: string[], base: string) => {
 }
 
 export const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/
+
+/**
+ * The engine reports problems as "path: message", where the path is dotted and
+ * list items are indexes ("scores.2.sql", "0.rules.1.value", "segments.vip").
+ * This returns the messages under one path, for showing next to a field.
+ */
+export function errorsAt(errors: string[], path: string): string | undefined {
+  const found = errors
+    .filter((e) => e.startsWith(path + ':') || e.startsWith(path + '.'))
+    .map((e) => e.slice(e.indexOf(':') + 1).trim())
+  return found.length ? found.join('; ') : undefined
+}
