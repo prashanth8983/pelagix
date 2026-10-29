@@ -57,18 +57,18 @@ export const login = createServerFn({ method: 'POST' })
   .validator(z.object({ email, password: z.string().max(200) }))
   .handler(async ({ data }) => {
     const a = await auth()
-    if (a.lockedOut(data.email)) return { error: 'Too many failed attempts. Try again in 15 minutes.' }
+    if (await a.lockedOut(data.email)) return { error: 'Too many failed attempts. Try again in 15 minutes.' }
     const pool = await a.ready()
     const { rows: [u] } = await pool.query(
       'SELECT id, email, password_hash, disabled FROM scorebase_auth.users WHERE lower(email) = $1', [data.email])
     // Same work and the same message whether or not the email exists.
     const ok = u ? await a.verifyPassword(data.password, u.password_hash) : (await a.hashPassword(data.password), false)
     if (!ok || u.disabled) {
-      a.noteFailure(data.email)
+      await a.noteFailure(data.email)
       await a.audit(u ?? null, 'login_failed', { email: data.email, reason: u?.disabled ? 'disabled' : 'bad credentials' })
       return { error: 'Wrong email or password' }
     }
-    a.clearFailures(data.email)
+    await a.clearFailures(data.email)
     await a.startSession(u.id)
     await a.audit(u, 'login')
     return { error: null }
