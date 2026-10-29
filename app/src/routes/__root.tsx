@@ -4,8 +4,8 @@ import {
 import { AlertTriangle, Compass } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { AppState } from '~/components/config/state'
-import { Shell } from '~/components/Shell'
-import { Toaster } from '~/components/Toaster'
+import { Shell } from '~/components/layout/Shell'
+import { Toaster } from '~/components/ui/Toaster'
 import { Button } from '~/components/ui'
 import { THEME_SCRIPT } from '~/lib/theme'
 import { getSession } from '~/server/users'
@@ -31,9 +31,15 @@ export const Route = createRootRoute({
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { name: 'color-scheme', content: 'light dark' },
-      { title: 'Scorebase' },
+      { title: 'Pelagix' },
+      { name: 'theme-color', content: '#0A2350' },
     ],
-    links: [{ rel: 'stylesheet', href: appCss }],
+    links: [
+      { rel: 'stylesheet', href: appCss },
+      { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+      { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png' },
+      { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+    ],
     scripts: [{ children: THEME_SCRIPT }],
   }),
   component: Root,
@@ -64,7 +70,7 @@ function Centered({ icon, title, children }: { icon: ReactNode; title: string; c
   return (
     <div className="grid min-h-[60vh] place-items-center px-4">
       <div className="max-w-md text-center">
-        <div className="mx-auto mb-4 grid size-10 place-items-center rounded-lg border border-line bg-surface text-muted [&_svg]:size-5">{icon}</div>
+        <div className="mx-auto mb-4 grid size-10 place-items-center rounded-lg border border-line bg-surface shadow-card text-muted [&_svg]:size-5">{icon}</div>
         <h1 className="text-lg font-semibold">{title}</h1>
         <div className="mt-1.5 text-[13px] text-muted">{children}</div>
       </div>
